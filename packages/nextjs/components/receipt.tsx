@@ -68,7 +68,7 @@ export function Receipt({ nft, type, timestamp, transactionHash }: ReceiptProps)
         {type === "purchase" && (
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Price</span>
-            <span className="font-medium">{nft.price} ETH</span>
+            <span className="font-medium">{nft.price} MOVE</span>
           </div>
         )}
         <div className="flex justify-between text-sm">

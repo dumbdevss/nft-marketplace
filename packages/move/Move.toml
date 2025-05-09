@@ -12,4 +12,4 @@ AptosTokenObjects = { git = "https://github.com/movementlabsxyz/aptos-core.git",
 
 
 [addresses]
-marketplace = "0xff50240f2028f28ad706e3b91df95c4b4cb681c32913927440c2e51fcdefac14"
+marketplace = "0x2a79f87aa5ee0e7ff1560dc330c7cad75cdbfad472a86cac461456f76e5a446c"

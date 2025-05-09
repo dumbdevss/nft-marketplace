@@ -45,16 +45,24 @@ module marketplace::NFTMarketplace {
     }
 
     // Auction Structure
-    struct Auction has store, drop {
+    struct Auction has store, drop, copy {
         deadline: option::Option<u64>,
         offers: vector<Offer>,
         highest_bid: u64,
         highest_bidder: option::Option<address>,
     }
 
+    // Collection Structure
+    struct Collection has copy, drop, store {
+        name: String,
+        description: String,
+        uri: String,
+        creator: address
+    }
+
     // NFT Structure
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct NFT has store, key {
+    struct NFT has store, key, copy {
         id: u64,
         owner: address,
         creator: address,
@@ -87,6 +95,10 @@ module marketplace::NFTMarketplace {
         nfts: vector<NFT>,
     }
 
+    struct Collections has key {
+        collections: vector<Collection>
+    }
+
     // Initialize Marketplace
     fun init_module(account: &signer) {
         let (resource_signer, signer_cap) = account::create_resource_account(account, SEED);
@@ -97,19 +109,68 @@ module marketplace::NFTMarketplace {
         move_to(account, MarketplaceFunds {
             signer_cap
         });
+        move_to(account, Collections {
+            collections: vector::empty<Collection>()
+        })
+    }
+
+    // Initialize Collection
+    public entry fun initialize_collection(
+        creator: &signer,
+        name: String,
+        description: String,
+        uri: String
+    ) acquires Collections {
+        let collections = borrow_global_mut<Collections>(@marketplace);
+        let collection = Collection {
+            description,
+            name,
+            uri,
+            creator: signer::address_of(creator)
+        };
+        vector::push_back(&mut collections.collections, collection);
+        collection::create_unlimited_collection(
+            creator,
+            description,
+            name,
+            option::none(),
+            uri
+        );
     }
 
     // Mint an NFT
     public entry fun mint_nft(
         creator: &signer,
         collection_name: String,
+        collection_description: option::Option<String>,
+        collection_uri: option::Option<String>,
         name: String,
         description: String,
         category: String,
         uri: String
-    ) acquires Marketplace {
+    ) acquires Marketplace, Collections {
         let resources_address = account::create_resource_address(&@marketplace, SEED);
+        let collections = borrow_global<Collections>(@marketplace);
         let marketplace = borrow_global_mut<Marketplace>(resources_address);
+
+        // Check if collection exists, if not initialize it
+        let coll_desc = option::extract(&mut collection_description);
+        let coll_uri = option::extract(&mut collection_uri);
+
+        let collection_exists = false;
+        let i = 0;
+        while (i < vector::length(&collections.collections)) {
+            let collection = vector::borrow(&collections.collections, i);
+            if (collection.name == collection_name) {
+                collection_exists = true;
+                break;
+            };
+            i = i + 1;
+        };
+        if (!collection_exists) {
+            initialize_collection(creator, collection_name, coll_desc, coll_uri);
+        };
+
         let token_constructor_ref = token::create_named_token(
             creator,
             collection_name,
@@ -392,6 +453,21 @@ module marketplace::NFTMarketplace {
         nft.auction = option::none();
     }
 
+    // Get All Collections by User
+    #[view]
+    public fun get_all_collections_by_user(account: address, limit: u64, offset: u64): vector<Collection> acquires Collections {
+        let collections = borrow_global<Collections>(@marketplace);
+        let result = vector::empty<Collection>();
+        let len = vector::length(&collections.collections);
+        let end = if (offset + limit < len) { offset + limit } else { len };
+        let i = offset;
+        while (i < end) {
+            vector::push_back(&mut result, *vector::borrow(&collections.collections, i));
+            i = i + 1;
+        };
+        result
+    }
+
     // View NFT Details
     #[view]
     public fun get_nft_details(nft_id: u64): (address, String, String, String, u64, bool, u8, option::Option<u64>, u64, vector<Offer>) acquires Marketplace {
@@ -409,14 +485,14 @@ module marketplace::NFTMarketplace {
 
     // View NFTs for Sale
     #[view]
-    public fun get_nfts_for_sale(): vector<u64> acquires Marketplace {
+    public fun get_nfts_for_sale(): vector<NFT> acquires Marketplace {
         let marketplace = borrow_global<Marketplace>(@marketplace);
-        let result = vector::empty<u64>();
+        let result = vector::empty<NFT>();
         let i = 0;
         while (i < vector::length(&marketplace.nfts)) {
             let nft = vector::borrow(&marketplace.nfts, i);
             if (nft.for_sale) {
-                vector::push_back(&mut result, nft.id);
+                vector::push_back(&mut result, *nft);
             };
             i = i + 1;
         };

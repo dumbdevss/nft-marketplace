@@ -1,11 +1,24 @@
+"use client"
+
+import { useEffect } from "react"
 import Link from "next/link"
 import { Button } from "~~/components/ui/button"
 import { Navbar } from "~~/components/navbar"
 import { FeaturedNFTs } from "~~/components/featured-nfts"
 import { Footer } from "~~/components/footer"
 import { AnimatedCounter } from "~~/components/animated-counter"
+import { useView } from "~~/hooks/scaffold-move/useView"
+import { NFT } from "~~/types/nft-types"
 
 export default function Home() {
+
+  const { data, error, isLoading } = useView({
+    moduleName: "NFTMarketplace",
+    functionName: "get_nfts_for_sale",
+  })
+
+  let nftsForSale = data?.[0] as NFT[] || []
+
   return (
     <div className="min-h-screen bg-black">
       <Navbar />
@@ -33,17 +46,20 @@ export default function Home() {
             <p className="mt-6 text-lg leading-8 text-white">
               Explore the world of digital art and collectibles. Buy, sell, and discover exclusive digital items.
             </p>
-            <div className="mt-10 flex items-center justify-center gap-x-6">
-              <Button
-                asChild
-                size="lg"
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              >
-                <Link href="/marketplace">Explore Marketplace</Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link href="/create">Create NFT</Link>
-              </Button>
+            <div className="mt-10 relative z-10 flex items-center justify-center gap-x-6">
+              <Link href="/marketplace">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                >
+                  Explore Marketplace
+                </Button>
+              </Link>
+              <Link href="/create">
+                <Button variant="outline" size="lg">
+                  Create NFT
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -62,7 +78,7 @@ export default function Home() {
         <section className="py-16 px-6">
           <div className="mx-auto max-w-7xl">
             <h2 className="text-3xl font-bold mb-10 text-center">Featured NFTs</h2>
-            <FeaturedNFTs />
+            <FeaturedNFTs nfts={nftsForSale} />
           </div>
         </section>
       </main>
