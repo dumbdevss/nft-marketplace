@@ -274,3 +274,43 @@ function assertType(val: any, types: string[] | string, message?: string) {
 export function normalizeAddress(address: string): string {
   return "0x" + address.substring(2).padStart(64, "0");
 }
+
+/**
+ * Formats an Aptos coin amount to a human-readable string
+ * Assumes the input is in atomic units (octas, where 1 MOVE = 10^8 octas)
+ */
+export function formatMoveCoin(amount: string | number): string {
+  if (!amount) return "0 MOVE";
+  
+  // Convert to number if it's a string
+  const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  // Convert from octas (10^8 = 100000000) to MOVE
+  const moveAmount = numericAmount / 100000000;
+  
+  // Format with 2 decimal places for display
+  return `${moveAmount.toFixed(2)} MOVE`;
+}
+
+/**
+ * Truncates a blockchain address for display
+ */
+export function truncateAddress(address: string): string {
+  if (!address) return "";
+  
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+}
+
+/**
+ * Formats a timestamp to a readable date string
+ */
+export function formatDate(timestamp: string | number): string {
+  if (!timestamp) return "";
+  
+  const date = new Date(timestamp);
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+}

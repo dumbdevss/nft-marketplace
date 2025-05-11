@@ -10,12 +10,12 @@ import { Label } from "~~/components/ui/label"
 import { Textarea } from "~~/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~~/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~~/components/ui/dialog"
-import { Receipt } from "~~/components/receipt"
+import Receipt from "~~/components/receipt"
 import { Upload, Plus, Loader2 } from "lucide-react"
 import { useView } from "~~/hooks/scaffold-move/useView"
 import { useWallet } from "@aptos-labs/wallet-adapter-react"
 import useSubmitTransaction from "~~/hooks/scaffold-move/useSubmitTransaction"
-import { isNull } from "node:util"
+import { NFT } from "~~/types/nft-types"
 
 export default function CreateNFT() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -36,14 +36,15 @@ export default function CreateNFT() {
   })
   const [uploadingFile, setUploadingFile] = useState(false)
   const [hash, setHash] = useState<string | null>(null)
-  
+  const [mintedNFT, setMintedNFT] = useState<NFT | null>(null)
+
   const { account } = useWallet()
   const { submitTransaction, transactionInProcess, transactionResponse } = useSubmitTransaction("NFTMarketplace")
 
   // Pinata API credentials - in a real app, these should be environment variables
-const PINATA_API_KEY = process.env.NEXT_PUBLIC_PINATA_API_KEY
-const PINATA_API_SECRET = process.env.NEXT_PUBLIC_PINATA_API_SECRET
-const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gateway.pinata.cloud/ipfs/"
+  const PINATA_API_KEY = process.env.NEXT_PUBLIC_PINATA_API_KEY
+  const PINATA_API_SECRET = process.env.NEXT_PUBLIC_PINATA_API_SECRET
+  const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gateway.pinata.cloud/ipfs/"
 
   const { data, error, isLoading, refetch } = useView({
     moduleName: "NFTMarketplace",
@@ -52,6 +53,30 @@ const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gatewa
   })
 
   const collections = data?.[0] || []
+  
+  // State for temporarily storing NFT collection and name for fetching after minting
+  const [mintedNFTInfo, setMintedNFTInfo] = useState<{collection: string, name: string} | null>(null)
+  
+  // This hook fetches NFT data for display in the receipt
+  const { 
+    data: fetchedNFTData, 
+    refetch: refetchNFT 
+  } = useView({
+    moduleName: "NFTMarketplace",
+    functionName: "get_nft_by_collection_name_and_token_name",
+    args: [
+      mintedNFTInfo?.collection || "",
+      mintedNFTInfo?.name || "",
+      account?.address as `0x${string}` || ""
+    ],
+  })
+  
+  // Effect to update mintedNFT when fetchedNFTData changes
+  useEffect(() => {
+    if (fetchedNFTData?.[0]?.vec?.[0]) {
+      setMintedNFT(fetchedNFTData[0].vec[0] as NFT)
+    }
+  }, [fetchedNFTData])
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadingFile(true)
@@ -84,40 +109,46 @@ const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gatewa
 
   const mintNFT = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     try {
       // The smart contract handles collection initialization internally
       // We just need to pass all the data in one call
-      const collectionName = collectionChoice === "new" ? newCollectionData.name : nftData.collection
+      const finalCollectionName = collectionChoice === "new" ? newCollectionData.name : nftData.collection
       const collectionDescription = collectionChoice === "new" ? newCollectionData.description : "null"
       const collectionUri = collectionChoice === "new" ? newCollectionData.uri : "null"
-      
+      const finalTokenName = nftData.name
+
       let response = await submitTransaction("mint_nft", [
-        collectionName,
+        finalCollectionName,
         collectionDescription,
         collectionUri,
-        nftData.name,
+        finalTokenName,
         nftData.description,
         nftData.category,
         fileUrl
       ])
+      
       setHash(response)
-      setShowReceipt(true)
+      
+          // Update the mintedNFTInfo state to trigger the useView hook
+      setMintedNFTInfo({
+        collection: finalCollectionName,
+        name: finalTokenName
+      })
+      
+      // Wait a moment for blockchain to process before fetching the NFT data
+      setTimeout(async () => {
+        // Use the refetchNFT function to get the latest data
+        const result = await refetchNFT()
+        
+        // After refetching, set the data and show receipt
+        setShowReceipt(true)
+      }, 2000)
     } catch (error) {
       console.error("Failed to mint NFT:", error)
     }
   }
 
-  const mockNft = {
-    id: "new-nft",
-    name: nftData.name || "Your New NFT",
-    collection: collectionChoice === "new" ? newCollectionData.name : nftData.collection,
-    description: nftData.description || "Your newly minted NFT",
-    image: previewImage || "/placeholder.svg?height=500&width=500",
-    owner: account?.address || "You",
-    contractAddress: account?.address || "0x1234567890abcdef1234567890abcdef12345678",
-    tokenId: "1",
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-background/80">
@@ -188,30 +219,30 @@ const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gatewa
                 {/* NFT Details */}
                 <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
-                  <Input 
-                    id="name" 
-                    placeholder="Item name" 
-                    required 
+                  <Input
+                    id="name"
+                    placeholder="Item name"
+                    required
                     value={nftData.name}
-                    onChange={(e) => setNftData({...nftData, name: e.target.value})}
+                    onChange={(e) => setNftData({ ...nftData, name: e.target.value })}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea 
-                    id="description" 
-                    placeholder="Provide a detailed description of your item" 
+                  <Textarea
+                    id="description"
+                    placeholder="Provide a detailed description of your item"
                     rows={4}
                     value={nftData.description}
-                    onChange={(e) => setNftData({...nftData, description: e.target.value})}
+                    onChange={(e) => setNftData({ ...nftData, description: e.target.value })}
                   />
                 </div>
 
                 {/* Collection Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="collection">Collection</Label>
-                  <Select 
+                  <Select
                     value={collectionChoice}
                     onValueChange={(value) => {
                       setCollectionChoice(value)
@@ -232,16 +263,16 @@ const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gatewa
                 {collectionChoice === "existing" && (
                   <div className="space-y-2">
                     <Label htmlFor="existingCollection">Select Collection</Label>
-                    <Select 
+                    <Select
                       value={nftData.collection}
-                      onValueChange={(value) => setNftData({...nftData, collection: value})}
+                      onValueChange={(value) => setNftData({ ...nftData, collection: value })}
                       disabled={isLoading || collections.length === 0}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder={
-                          isLoading ? "Loading collections..." : 
-                          collections.length === 0 ? "No collections found" : 
-                          "Select a collection"
+                          isLoading ? "Loading collections..." :
+                            collections.length === 0 ? "No collections found" :
+                              "Select a collection"
                         } />
                       </SelectTrigger>
                       <SelectContent>
@@ -264,36 +295,36 @@ const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gatewa
                 {isCreatingCollection && (
                   <div className="space-y-4 border border-muted p-4 rounded-lg">
                     <h3 className="font-medium">New Collection Details</h3>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="collectionName">Collection Name</Label>
-                      <Input 
-                        id="collectionName" 
-                        placeholder="Collection name" 
+                      <Input
+                        id="collectionName"
+                        placeholder="Collection name"
                         required={isCreatingCollection}
                         value={newCollectionData.name}
-                        onChange={(e) => setNewCollectionData({...newCollectionData, name: e.target.value})}
+                        onChange={(e) => setNewCollectionData({ ...newCollectionData, name: e.target.value })}
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="collectionDescription">Collection Description</Label>
-                      <Textarea 
-                        id="collectionDescription" 
-                        placeholder="Describe your collection" 
+                      <Textarea
+                        id="collectionDescription"
+                        placeholder="Describe your collection"
                         rows={2}
                         value={newCollectionData.description}
-                        onChange={(e) => setNewCollectionData({...newCollectionData, description: e.target.value})}
+                        onChange={(e) => setNewCollectionData({ ...newCollectionData, description: e.target.value })}
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="collectionUri">Collection Image URL</Label>
-                      <Input 
-                        id="collectionUri" 
-                        placeholder="https://example.com/collection-image.png" 
+                      <Input
+                        id="collectionUri"
+                        placeholder="https://example.com/collection-image.png"
                         value={newCollectionData.uri}
-                        onChange={(e) => setNewCollectionData({...newCollectionData, uri: e.target.value})}
+                        onChange={(e) => setNewCollectionData({ ...newCollectionData, uri: e.target.value })}
                       />
                       <p className="text-xs text-muted-foreground">Optional: URL to an image representing this collection</p>
                     </div>
@@ -303,9 +334,9 @@ const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gatewa
                 {/* Category */}
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
-                  <Select 
+                  <Select
                     value={nftData.category}
-                    onValueChange={(value) => setNftData({...nftData, category: value})}
+                    onValueChange={(value) => setNftData({ ...nftData, category: value })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -356,15 +387,15 @@ const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gatewa
           <DialogHeader>
             <DialogTitle>NFT Created Successfully</DialogTitle>
           </DialogHeader>
-          <Receipt
-            nft={mockNft}
-            type="mint"
-            timestamp={new Date().toISOString()}
-            transactionHash={hash || ""}
-          />
-          <div className="mt-4 flex justify-end">
-            <Button onClick={() => setShowReceipt(false)}>Close</Button>
-          </div>
+          {mintedNFT && (
+            <Receipt
+              nft={mintedNFT}
+              type="mint"
+              timestamp={new Date().toISOString()}
+              transactionHash={hash || ""}
+              closeReceipt={() => setShowReceipt(false)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

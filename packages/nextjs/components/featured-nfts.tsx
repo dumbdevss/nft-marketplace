@@ -46,11 +46,10 @@ export function FeaturedNFTs({ nfts = [] }: { nfts: NFT[] }) {
           <Link href={`/nft/${nft.id}`} key={nft.id} className="group">
             <Card className="overflow-hidden bg-card/50 backdrop-blur-sm border-muted transition-all hover:border-primary">
               <div className="relative aspect-square">
-                <Image
+                <img
                   src={nft.uri || "/placeholder.svg"}
                   alt={nft.name}
-                  fill
-                  className="object-cover transition-transform group-hover:scale-105"
+                  className="h-full w-full object-cover transition-transform hover:scale-105"
                 />
                 {nft.for_sale && (
                   <Badge className="absolute top-2 right-2 bg-gradient-to-r from-purple-600 to-pink-600">

@@ -7,36 +7,64 @@ import { Slider } from "~~/components/ui/slider"
 import { Separator } from "~~/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~~/components/ui/collapsible"
 import { ChevronDown, ChevronUp } from "lucide-react"
+import { Collection } from "~~/types/collection-types"
 
-export function NFTFilters() {
-  const [priceRange, setPriceRange] = useState([0, 10])
-  const [statusFilters, setStatusFilters] = useState({
-    buyNow: true,
-    onAuction: false,
-    newItem: false,
-    hasOffers: false,
-  })
-  const [collectionFilters, setCollectionFilters] = useState({
-    cryptoPunks: false,
-    boredApe: false,
-    azuki: false,
-    doodles: false,
-    artBlocks: false,
-  })
+interface NFTFiltersProps {
+  priceRange: [number, number]
+  setPriceRange: (range: [number, number]) => void
+  categoryFilters: {
+    art: boolean
+    collectibles: boolean
+    gaming: boolean
+    sports: boolean
+    music: boolean
+    photography: boolean
+  }
+  setCategoryFilters: (filters: any) => void
+  statusFilters: {
+    buyNow: boolean
+    onAuction: boolean
+    newItem: boolean
+    hasOffers: boolean
+  }
+  setStatusFilters: (filters: any) => void
+  collectionFilters: any
+  setCollectionFilters: (filters: any) => void,
+  collections: Collection[]
+}
+
+export function NFTFilters({
+  priceRange,
+  setPriceRange,
+  categoryFilters,
+  setCategoryFilters,
+  statusFilters,
+  setStatusFilters,
+  collectionFilters,
+  setCollectionFilters,
+  collections
+}: NFTFiltersProps) {
   const [categoryOpen, setCategoryOpen] = useState(true)
   const [statusOpen, setStatusOpen] = useState(true)
   const [priceOpen, setPriceOpen] = useState(true)
   const [collectionsOpen, setCollectionsOpen] = useState(true)
 
+  const handleCategoryChange = (key: keyof typeof categoryFilters) => {
+    setCategoryFilters((prev: any) => ({
+      ...prev,
+      [key]: !prev[key],
+    }))
+  }
+
   const handleStatusChange = (key: keyof typeof statusFilters) => {
-    setStatusFilters((prev) => ({
+    setStatusFilters((prev: any) => ({
       ...prev,
       [key]: !prev[key],
     }))
   }
 
   const handleCollectionChange = (key: keyof typeof collectionFilters) => {
-    setCollectionFilters((prev) => ({
+    setCollectionFilters((prev: any) => ({
       ...prev,
       [key]: !prev[key],
     }))
@@ -44,6 +72,14 @@ export function NFTFilters() {
 
   const handleReset = () => {
     setPriceRange([0, 10])
+    setCategoryFilters({
+      art: false,
+      collectibles: false,
+      gaming: false,
+      sports: false,
+      music: false,
+      photography: false,
+    })
     setStatusFilters({
       buyNow: false,
       onAuction: false,
@@ -57,6 +93,11 @@ export function NFTFilters() {
       doodles: false,
       artBlocks: false,
     })
+  }
+
+  const handleApplyFilters = () => {
+    // All state is already lifted to parent, no additional action needed
+    // This button exists for UX purposes
   }
 
   return (
@@ -77,7 +118,11 @@ export function NFTFilters() {
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-2 pb-4 space-y-2">
           <div className="flex items-center space-x-2">
-            <Checkbox id="art" />
+            <Checkbox
+              id="art"
+              checked={categoryFilters.art}
+              onCheckedChange={() => handleCategoryChange("art")}
+            />
             <label
               htmlFor="art"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -86,7 +131,11 @@ export function NFTFilters() {
             </label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="collectibles" />
+            <Checkbox
+              id="collectibles"
+              checked={categoryFilters.collectibles}
+              onCheckedChange={() => handleCategoryChange("collectibles")}
+            />
             <label
               htmlFor="collectibles"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -95,16 +144,24 @@ export function NFTFilters() {
             </label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="domain-names" />
+            <Checkbox
+              id="domain-names"
+              checked={categoryFilters.gaming}
+              onCheckedChange={() => handleCategoryChange("gaming")}
+            />
             <label
               htmlFor="domain-names"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
-              Domain Names
+             Gaming
             </label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="music" />
+            <Checkbox
+              id="music"
+              checked={categoryFilters.music}
+              onCheckedChange={() => handleCategoryChange("music")}
+            />
             <label
               htmlFor="music"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -113,12 +170,29 @@ export function NFTFilters() {
             </label>
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox id="photography" />
+            <Checkbox
+              id="photography"
+              checked={categoryFilters.photography}
+              onCheckedChange={() => handleCategoryChange("photography")}
+            />
             <label
               htmlFor="photography"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
             >
               Photography
+            </label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="photography"
+              checked={categoryFilters.sports}
+              onCheckedChange={() => handleCategoryChange("sports")}
+            />
+            <label
+              htmlFor="photography"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Sports
             </label>
           </div>
         </CollapsibleContent>
@@ -196,15 +270,20 @@ export function NFTFilters() {
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-2 pb-4">
           <div className="space-y-4">
-            <Slider defaultValue={[0, 10]} max={10} step={0.1} value={priceRange} onValueChange={setPriceRange} />
+            <Slider
+              max={1000}
+              step={0.1}
+              value={priceRange}
+              onValueChange={(value) => setPriceRange(value as [number, number])}
+            />
             <div className="flex items-center justify-between">
               <div className="border rounded-md px-2 py-1 w-20">
                 <p className="text-xs text-muted-foreground">Min</p>
-                <p>{priceRange[0]} ETH</p>
+                <p>{priceRange[0]} MOVE</p>
               </div>
-              <div className="border rounded-md px-2 py-1 w-20">
+              <div className="border rounded-md px-2 py-1">
                 <p className="text-xs text-muted-foreground">Max</p>
-                <p>{priceRange[1]} ETH</p>
+                <p className="whitespace-nowrap">{priceRange[1]} MOVE</p>
               </div>
             </div>
           </div>
@@ -219,80 +298,34 @@ export function NFTFilters() {
           {collectionsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-2 pb-4 space-y-2">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="crypto-punks"
-              checked={collectionFilters.cryptoPunks}
-              onCheckedChange={() => handleCollectionChange("cryptoPunks")}
-            />
-            <label
-              htmlFor="crypto-punks"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              CryptoPunks
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="bored-ape"
-              checked={collectionFilters.boredApe}
-              onCheckedChange={() => handleCollectionChange("boredApe")}
-            />
-            <label
-              htmlFor="bored-ape"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Bored Ape Yacht Club
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="azuki"
-              checked={collectionFilters.azuki}
-              onCheckedChange={() => handleCollectionChange("azuki")}
-            />
-            <label
-              htmlFor="azuki"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Azuki
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="doodles"
-              checked={collectionFilters.doodles}
-              onCheckedChange={() => handleCollectionChange("doodles")}
-            />
-            <label
-              htmlFor="doodles"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Doodles
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="art-blocks"
-              checked={collectionFilters.artBlocks}
-              onCheckedChange={() => handleCollectionChange("artBlocks")}
-            />
-            <label
-              htmlFor="art-blocks"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Art Blocks
-            </label>
-          </div>
+          {collections.map((collection: Collection) => {
+            return (
+              <div key={collection.name} className="flex items-center space-x-2">
+                <Checkbox
+                  id={collection.name}
+                  checked={collectionFilters[collection.name]}
+                  onCheckedChange={() => handleCollectionChange(collection.name)}
+                />
+                <label
+                  htmlFor={collection.name}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  {collection.name}
+                </label>
+              </div>
+            )
+          })}
         </CollapsibleContent>
       </Collapsible>
 
       <Separator />
 
-      <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+      {/* <Button
+        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+        onClick={handleApplyFilters}
+      >
         Apply Filters
-      </Button>
+      </Button> */}
     </div>
   )
 }
-

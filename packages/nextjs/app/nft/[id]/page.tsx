@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import Image from "next/image"
 import { useParams } from "next/navigation"
 import { Navbar } from "~~/components/navbar"
@@ -10,17 +10,213 @@ import { Card, CardContent } from "~~/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~~/components/ui/tabs"
 import { Badge } from "~~/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~~/components/ui/dialog"
-import { Receipt } from "~~/components/receipt"
+import { Input } from "~~/components/ui/input"
+import Receipt from "~~/components/receipt"
+import { useToast } from "~~/hooks/use-toast"
+import { NFT } from "~~/types/nft-types"
+import { useWallet } from "@aptos-labs/wallet-adapter-react"
+import useSubmitTransaction from "~~/hooks/scaffold-move/useSubmitTransaction"
 import { getNFTById } from "~~/lib/nft-data"
 import { Clock, Heart, Share2, Tag, MoveIcon as Transfer } from "lucide-react"
+import { useView } from "~~/hooks/scaffold-move/useView"
+import CopyToClipboard from "react-copy-to-clipboard"
+
+// Define the NFTDetails type
+type NFTDetails = {
+  id: string;            // ID of the NFT
+  owner: `0x${string}`;  // Blockchain address of the owner
+  creator: `0x${string}`; // Creator address
+  created_at: number;    // Creation timestamp
+  name: string;          // Name of the NFT
+  description: string;   // Description of the NFT
+  uri: string;           // URI pointing to the NFT's media
+  price: number;         // Listed price or reserve price
+  for_sale: boolean;     // Whether the NFT is currently listed for sale
+  sale_type: number;     // 0 = direct sale, 1 = auction, etc.
+  category: string;      // Category of the NFT
+  collection_name: string; // Collection name
+  auction: any;          // Auction details
+  token: any;            // Token ID
+  history: {             // History of transactions
+    new_owner: `0x${string}`;
+    seller: `0x${string}`;
+    amount: number;
+    timestamp: number;
+  }[];
+}
 
 export default function NFTDetail() {
   const { id } = useParams()
-  const nft = getNFTById(id as string)
+  const nftStatic = getNFTById(id as string)
   const [showBuyDialog, setShowBuyDialog] = useState(false)
   const [showTransferDialog, setShowTransferDialog] = useState(false)
+  const [showOfferDialog, setShowOfferDialog] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
-  const [transactionType, setTransactionType] = useState<"purchase" | "transfer">("purchase")
+  const [hash, setHash] = useState("")
+  const [transferAddress, setTransferAddress] = useState<`0x${string}`>('0x' as `0x${string}`)
+  const [offerAmount, setOfferAmount] = useState(0)
+  const [transactionType, setTransactionType] = useState<"purchase" | "transfer" | "offer" | "resolve">('purchase')
+  const { account } = useWallet()
+  const { submitTransaction, transactionInProcess } = useSubmitTransaction("NFTMarketplace")
+  const [like, setLike] = useState(false)
+  const { toast } = useToast()
+
+  // Fetch NFT data using the useView hook
+  const {
+    data: nftRawData,
+    refetch: refetchNFT,
+    isLoading
+  } = useView({
+    moduleName: "NFTMarketplace",
+    functionName: "get_nft_details",
+    args: [parseInt(id as string)],
+  })
+
+  // Parse NFT data using useMemo with proper typing
+  const nftData = useMemo<NFTDetails | null>(() => {
+    if (!nftRawData || !Array.isArray(nftRawData)) {
+      return null;
+    }
+
+    const data = nftRawData[0] as NFT; // Get the NFT data from the first index
+
+    return {
+      id: data.id || id as string,
+      owner: data.owner || '0x0000000000000000000000000000000000000000',
+      creator: data.creator || '0x0000000000000000000000000000000000000000',
+      created_at: data.created_at || Date.now(),
+      name: data.name || 'Unnamed NFT',
+      description: data.description || '',
+      uri: data.uri || '',
+      price: data.price / 100000000 || 0, // Convert from smallest units
+      for_sale: Boolean(data.for_sale),
+      sale_type: typeof data.sale_type === 'number' ? data.sale_type : 0,
+      category: data.category || '',
+      collection_name: data.collection_name || '',
+      auction: data.auction || {},
+      token: data.token || {},
+      history: Array.isArray(data.history) ? data.history.map((item: any) => ({
+        new_owner: item.new_owner || '0x0000000000000000000000000000000000000000',
+        seller: item.seller || '0x0000000000000000000000000000000000000000',
+        amount: parseInt(item.amount) / 100000000 || 0, // Convert from smallest units
+        timestamp: parseInt(item.timestamp) || 0
+      })) : []
+    };
+  }, [nftRawData, id]);
+
+  // Merge static and blockchain data
+  const nft: any = useMemo(() => {
+    if (!nftData) return nftStatic;
+    return {
+      ...nftStatic,
+      ...nftData,
+      // Add any specific mappings if needed
+    };
+  }, [nftStatic, nftData]);
+
+  const isOwner = account?.address === nftData?.owner;
+  const isAuction = nftData?.sale_type === 1;
+  const auctionEnded = isAuction && nftData?.auction?.deadline < Date.now() / 1000;
+
+  const handlePurchase = async () => {
+    try {
+
+      setTransactionType("purchase");
+
+      const response = await submitTransaction("purchase_nft", [
+        parseInt(id as string),
+      ]);
+
+      setHash(response);
+      setShowBuyDialog(false);
+
+      // Wait for blockchain to process
+      setTimeout(async () => {
+        await refetchNFT();
+        setShowReceipt(true);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to purchase NFT:", error);
+    }
+  }
+
+  const handlePlaceOffer = async () => {
+    try {
+      setShowOfferDialog(false);
+      setTransactionType("offer");
+
+      // Convert to smallest units
+      const offerAmountInSmallestUnits = Math.floor(offerAmount * 100000000);
+
+      const response = await submitTransaction("place_offer", [
+        parseInt(id as string),
+        offerAmountInSmallestUnits,
+      ]);
+
+      setHash(response);
+
+      setTimeout(async () => {
+        await refetchNFT();
+        setShowReceipt(true);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to place offer:", error);
+    }
+  }
+
+  const handleTransferNFT = async () => {
+    try {
+      setShowTransferDialog(false);
+      setTransactionType("transfer");
+
+      const response = await submitTransaction("transfer_nft", [
+        parseInt(id as string),
+        transferAddress,
+      ]);
+
+      setHash(response);
+
+      setTimeout(async () => {
+        await refetchNFT();
+        setShowReceipt(true);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to transfer NFT:", error);
+    }
+  }
+
+  const handleResolveAuction = async () => {
+    try {
+      setTransactionType("resolve");
+
+      const response = await submitTransaction("finalize_auction", [
+        parseInt(id as string),
+      ]);
+
+      setHash(response);
+
+      setTimeout(async () => {
+        await refetchNFT();
+        setShowReceipt(true);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to resolve auction:", error);
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background to-background/80">
+        <Navbar />
+        <main className="py-12 px-6">
+          <div className="mx-auto max-w-7xl text-center">
+            <h1 className="text-4xl font-bold mb-4">Loading NFT...</h1>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   if (!nft) {
     return (
@@ -34,20 +230,38 @@ export default function NFTDetail() {
         </main>
         <Footer />
       </div>
-    )
+    );
   }
 
-  const handleBuy = () => {
-    setShowBuyDialog(false)
-    setTransactionType("purchase")
-    setShowReceipt(true)
-  }
+  // Format timestamp to readable date
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleString();
+  };
 
-  const handleTransfer = () => {
-    setShowTransferDialog(false)
-    setTransactionType("transfer")
-    setShowReceipt(true)
-  }
+  // Format address to shortened version
+  const shortenAddress = (address: string) => {
+    if (!address || address.length < 10) return address;
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+  };
+
+  const handleCopy = () => {
+    toast({
+      title: 'Success',
+      description: "NFt link copied to clipboard",
+      variant: 'default',
+      className: 'bg-green-700 text-foreground',
+    });
+  };
+
+  const handleLike = () => {
+    setLike(!like);
+    toast({
+      title: like ? 'Unliked' : 'Liked',
+      description: like ? "You unliked this NFT" : "You liked this NFT",
+      variant: 'default',
+      className: 'bg-green-700 text-foreground',
+    });
+   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-background/80">
@@ -57,65 +271,110 @@ export default function NFTDetail() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             {/* NFT Image */}
             <div className="relative aspect-square rounded-xl overflow-hidden border border-muted">
-              <Image src={nft.image || "/placeholder.svg"} alt={nft.name} fill className="object-cover" />
+              <img
+                src={`${nft.uri}` || "/placeholder.svg"}
+                alt={nft.name}
+                className="object-cover w-full"
+              />
             </div>
 
             {/* NFT Details */}
             <div>
               <div className="flex justify-between items-start mb-4">
                 <Badge variant="outline" className="bg-muted/30 text-primary-foreground">
-                  {nft.collection}
+                  {nft.collection_name}
                 </Badge>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="icon">
-                    <Heart className="h-4 w-4" />
+                  <Button onClick={handleLike} variant="outline" size="icon">
+                    <Heart className={`h-4 w-4 ${like && 'fill-red-700'}`} />
                   </Button>
-                  <Button variant="outline" size="icon">
-                    <Share2 className="h-4 w-4" />
-                  </Button>
+                  <CopyToClipboard text={`http://localhost/nft/${nft.id}`} onCopy={handleCopy}>
+                    <Button variant="outline" size="icon">
+                      <Share2 className="h-4 w-4" />
+                    </Button>
+                  </CopyToClipboard>
                 </div>
               </div>
 
               <h1 className="text-3xl font-bold mb-2">{nft.name}</h1>
               <div className="flex items-center gap-2 mb-6">
                 <p className="text-muted-foreground">Owned by</p>
-                <span className="font-medium text-primary-foreground">{nft.owner}</span>
+                <span className="font-medium text-primary-foreground">
+                  {shortenAddress(nft.owner)}
+                </span>
               </div>
 
               <Card className="bg-card/50 backdrop-blur-sm border-muted mb-6">
                 <CardContent className="pt-6">
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="text-sm text-muted-foreground">Current Price</p>
-                      <p className="text-3xl font-bold">{nft.price} ETH</p>
-                      <p className="text-sm text-muted-foreground">(≈ ${(nft.price * 3500).toLocaleString()})</p>
+                      <p className="text-sm text-muted-foreground">
+                        {isAuction ? "Current Bid" : "Current Price"}
+                      </p>
+                      <p className="text-3xl font-bold">{nft.price} MOVE</p>
+                      <p className="text-sm text-muted-foreground">
+                        (≈ ${(nft.price * 7.50).toLocaleString()})
+                      </p>
                     </div>
                     <div className="flex gap-3">
-                      <Button
-                        onClick={() => setShowBuyDialog(true)}
-                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                      >
-                        <Tag className="mr-2 h-4 w-4" /> Buy Now
-                      </Button>
-                      <Button variant="outline" onClick={() => setShowTransferDialog(true)}>
-                        <Transfer className="mr-2 h-4 w-4" /> Transfer
-                      </Button>
+                      {!isOwner && nft.for_sale && (
+                        isAuction ? (
+                          <Button
+                            onClick={() => setShowOfferDialog(true)}
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                          >
+                            <Tag className="mr-2 h-4 w-4" /> Place Bid
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => setShowBuyDialog(true)}
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                          >
+                            <Tag className="mr-2 h-4 w-4" /> Buy Now
+                          </Button>
+                        )
+                      )}
+
+                      {isOwner && (
+                        <Button variant="outline" onClick={() => setShowTransferDialog(true)}>
+                          <Transfer className="mr-2 h-4 w-4" /> Transfer
+                        </Button>
+                      )}
+
+                      {isAuction && auctionEnded && (
+                        <Button
+                          onClick={handleResolveAuction}
+                          disabled={transactionInProcess}
+                          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                        >
+                          Resolve Auction
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <div className="flex items-center gap-4 mb-6">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Sale ends in 23h 59m 59s</span>
+              {isAuction && nft.auction?.deadline && (
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {auctionEnded
+                        ? "Auction has ended"
+                        : `Auction ends at ${formatDate(nft.auction.deadline)}`
+                      }
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <Tabs defaultValue="details">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className={`grid w-full ${isAuction && isOwner ? "grid-cols-3" : "grid-cols-2"}`}>
                   <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="properties">Properties</TabsTrigger>
+                  {isAuction && (
+                    <TabsTrigger value="bids">Bids</TabsTrigger>
+                  )}
                   <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
                 <TabsContent value="details" className="mt-4">
@@ -123,51 +382,72 @@ export default function NFTDetail() {
                     <p>{nft.description}</p>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Contract Address</p>
-                        <p className="font-mono text-sm truncate">{nft.contractAddress}</p>
+                        <p className="text-sm text-muted-foreground">Creator</p>
+                        <p className="font-mono text-sm truncate">{shortenAddress(nft.creator)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Token ID</p>
-                        <p className="font-mono text-sm">{nft.tokenId}</p>
+                        <p className="font-mono text-sm">{nft.id}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Token Standard</p>
-                        <p>ERC-721</p>
+                        <p className="text-sm text-muted-foreground">Category</p>
+                        <p>{nft.category}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Blockchain</p>
-                        <p>Ethereum</p>
+                        <p className="text-sm text-muted-foreground">Created</p>
+                        <p>{formatDate(nft.created_at)}</p>
                       </div>
                     </div>
                   </div>
                 </TabsContent>
-                <TabsContent value="properties" className="mt-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {nft.properties.map((prop, index) => (
-                      <div key={index} className="border border-muted rounded-lg p-3 text-center bg-muted/20">
-                        <p className="text-xs text-muted-foreground uppercase">{prop.trait_type}</p>
-                        <p className="font-medium text-primary-foreground">{prop.value}</p>
-                        <p className="text-xs text-muted-foreground">{prop.rarity}% have this trait</p>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
+                {isAuction && (
+                  <TabsContent value="bids" className="mt-4">
+                    <div className="space-y-4">
+                      {nft.auction?.vec?.[0].offers && nft.auction?.vec?.[0].offers?.length > 0 ? (
+                        nft.auction?.vec?.[0].offers?.map((bid: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center border-b border-muted pb-3">
+                            <div>
+                              <p className="font-medium">Bid</p>
+                              <p className="text-sm text-muted-foreground">
+                                From {shortenAddress(bid.bidder)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p>{parseFloat(bid.amount) / 100000000} MOVE</p>
+                              <p className="text-sm text-muted-foreground">{formatDate(bid.timestamp)}</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No bids available for this NFT
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                )}
                 <TabsContent value="history" className="mt-4">
                   <div className="space-y-4">
-                    {nft.history.map((event, index) => (
-                      <div key={index} className="flex justify-between items-center border-b border-muted pb-3">
-                        <div>
-                          <p className="font-medium">{event.event}</p>
-                          <p className="text-sm text-muted-foreground">
-                            From {event.from} to {event.to}
-                          </p>
+                    {nft.history && nft.history.length > 0 ? (
+                      nft.history.map((event: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center border-b border-muted pb-3">
+                          <div>
+                            <p className="font-medium">Transfer</p>
+                            <p className="text-sm text-muted-foreground">
+                              From {shortenAddress(event.seller)} to {shortenAddress(event.new_owner)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p>{event.amount > 0 ? `${event.amount} MOVE` : "N/A"}</p>
+                            <p className="text-sm text-muted-foreground">{formatDate(event.timestamp)}</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p>{event.price ? `${event.price} ETH` : "N/A"}</p>
-                          <p className="text-sm text-muted-foreground">{event.date}</p>
-                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No transaction history available for this NFT
                       </div>
-                    ))}
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
@@ -186,21 +466,65 @@ export default function NFTDetail() {
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-between">
               <span>Item Price</span>
-              <span className="font-medium">{nft.price} ETH</span>
+              <span className="font-medium">{nft.price} MOVE</span>
             </div>
             <div className="flex items-center justify-between">
               <span>Processing Fee</span>
-              <span className="font-medium">0.01 ETH</span>
+              <span className="font-medium">{((nft.price * 0.05) + nft.price).toFixed(2)} MOVE</span>
             </div>
             <div className="border-t border-muted pt-2 flex items-center justify-between">
               <span className="font-medium">Total</span>
-              <span className="font-medium">{nft.price + 0.01} ETH</span>
+              <span className="font-medium">{((nft.price * 0.05) + nft.price).toFixed(2)} MOVE</span>
             </div>
             <Button
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              onClick={handleBuy}
+              onClick={handlePurchase}
+              disabled={transactionInProcess}
             >
-              Confirm Purchase
+              {transactionInProcess ? "Processing..." : "Confirm Purchase"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Place Offer/Bid Dialog */}
+      <Dialog open={showOfferDialog} onOpenChange={setShowOfferDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Place {isAuction ? "Bid" : "Offer"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="amount" className="text-sm font-medium">
+                {isAuction ? "Bid Amount" : "Offer Amount"} (MOVE)
+              </label>
+              <Input
+                id="amount"
+                type="number"
+                min={isAuction ? nft.price + 0.1 : 0.1}
+                step="0.1"
+                value={offerAmount}
+                onChange={(e) => setOfferAmount(parseFloat(e.target.value))}
+                placeholder="Enter amount in MOVE"
+              />
+              {isAuction && (
+                <p className="text-xs text-muted-foreground">
+                  Minimum bid: {nft.price + 0.1} MOVE
+                </p>
+              )}
+            </div>
+            <div className="border-t border-muted pt-2 flex items-center justify-between">
+              <span>Processing Fee</span>
+              <span className="font-medium">{offerAmount + (0.05 * offerAmount)} MOVE</span>
+            </div>
+            <Button
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              onClick={handlePlaceOffer}
+              disabled={transactionInProcess ||
+                (isAuction && offerAmount <= nft.price) ||
+                offerAmount <= 0}
+            >
+              {transactionInProcess ? "Processing..." : `Confirm ${isAuction ? "Bid" : "Offer"}`}
             </Button>
           </div>
         </DialogContent>
@@ -217,41 +541,44 @@ export default function NFTDetail() {
               <label htmlFor="address" className="text-sm font-medium">
                 Recipient Address
               </label>
-              <input
+              <Input
                 id="address"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={transferAddress}
+                onChange={(e) => setTransferAddress(e.target.value as `0x${string}`)}
+                className="font-mono"
                 placeholder="0x..."
               />
             </div>
             <div className="border-t border-muted pt-2 flex items-center justify-between">
               <span>Gas Fee</span>
-              <span className="font-medium">0.002 ETH</span>
+              <span className="font-medium">0.002 MOVE</span>
             </div>
             <Button
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              onClick={handleTransfer}
+              onClick={handleTransferNFT}
+              disabled={transactionInProcess || !transferAddress.startsWith('0x') || transferAddress.length < 10}
             >
-              Confirm Transfer
+              {transactionInProcess ? "Processing..." : "Confirm Transfer"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Receipt Dialog */}
-      <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
+      {hash && <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Transaction Receipt</DialogTitle>
           </DialogHeader>
           <Receipt
-            nft={nft}
+            nft={nftData as NFT}
             type={transactionType}
             timestamp={new Date().toISOString()}
-            transactionHash="0x3a4e8b9c7d6f5e2a1b0c9d8e7f6a5b4c3d2e1f0a"
+            transactionHash={hash}
+            closeReceipt={() => setShowReceipt(false)}
           />
         </DialogContent>
-      </Dialog>
+      </Dialog>}
     </div>
   )
 }
-

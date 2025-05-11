@@ -62,7 +62,7 @@ module marketplace::NFTMarketplace {
 
     // NFT Structure
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct NFT has store, key, copy {
+    struct NFT has store, key, copy, drop {
         id: u64,
         owner: address,
         creator: address,
@@ -77,6 +77,14 @@ module marketplace::NFTMarketplace {
         sale_type: u8,
         auction: option::Option<Auction>,
         token: Object<Token>,
+        history: vector<History>,
+    }
+
+    struct History has store, drop, copy {
+        new_owner: address,
+        seller: address,
+        amount: u64,
+        timestamp: u64,
     }
 
     // Transfer Reference for NFT
@@ -199,6 +207,7 @@ module marketplace::NFTMarketplace {
             sale_type: SALE_TYPE_INSTANT,
             auction: option::none(),
             token: token_object,
+            history: vector::empty<History>(),
         };
 
         vector::push_back(&mut marketplace.nfts, nft);
@@ -330,6 +339,12 @@ module marketplace::NFTMarketplace {
         };
 
         nft.for_sale = false;
+        vector::push_back(&mut nft.history, History {
+            new_owner: nft.owner,
+            seller: signer::address_of(owner),
+            amount: auction.highest_bid,
+            timestamp: timestamp::now_seconds(),
+        });
         nft.price = 0;
         nft.sale_type = SALE_TYPE_INSTANT;
         nft.auction = option::none();
@@ -371,6 +386,12 @@ module marketplace::NFTMarketplace {
 
         nft.owner = buyer_addr;
         nft.for_sale = false;
+        vector::push_back(&mut nft.history, History {
+            new_owner: buyer_addr,
+            seller: seller_addr,
+            amount: price,
+            timestamp: timestamp::now_seconds(),
+        });
         nft.price = 0;
         nft.sale_type = SALE_TYPE_INSTANT;
         nft.auction = option::none();
@@ -462,6 +483,24 @@ module marketplace::NFTMarketplace {
         let end = if (offset + limit < len) { offset + limit } else { len };
         let i = offset;
         while (i < end) {
+            let collection = vector::borrow(&collections.collections, i);
+            if(collection.creator == account) {
+                vector::push_back(&mut result, *collection);
+            };
+            i = i + 1;
+        };
+        result
+    }
+
+    // Get All Collections by User
+    #[view]
+    public fun get_all_collections(limit: u64, offset: u64): vector<Collection> acquires Collections {
+        let collections = borrow_global<Collections>(@marketplace);
+        let result = vector::empty<Collection>();
+        let len = vector::length(&collections.collections);
+        let end = if (offset + limit < len) { offset + limit } else { len };
+        let i = offset;
+        while (i < end) {
             vector::push_back(&mut result, *vector::borrow(&collections.collections, i));
             i = i + 1;
         };
@@ -470,45 +509,73 @@ module marketplace::NFTMarketplace {
 
     // View NFT Details
     #[view]
-    public fun get_nft_details(nft_id: u64): (address, String, String, String, u64, bool, u8, option::Option<u64>, u64, vector<Offer>) acquires Marketplace {
-        let marketplace = borrow_global<Marketplace>(@marketplace);
+    public fun get_nft_details(nft_id: u64): NFT acquires Marketplace {
+        let resources_address = account::create_resource_address(&@marketplace, SEED);
+        let marketplace = borrow_global<Marketplace>(resources_address);
         assert!(nft_id < vector::length(&marketplace.nfts), E_NFT_NOT_FOUND);
         let nft = vector::borrow(&marketplace.nfts, nft_id);
-        let (deadline, highest_bid, offers) = if (option::is_some(&nft.auction)) {
-            let auction = option::borrow(&nft.auction);
-            (auction.deadline, auction.highest_bid, auction.offers)
-        } else {
-            (option::none(), 0, vector::empty<Offer>())
+        *nft
+    }
+
+    // View NFT Details
+    #[view]
+    public fun get_nft_by_collection_name_and_token_name(
+        collection_name: String,
+        token_name: String,
+        user_address: address
+    ): option::Option<NFT> acquires Marketplace {
+        let resources_address = account::create_resource_address(&@marketplace, SEED);
+        let marketplace = borrow_global<Marketplace>(resources_address);
+        let nfts = marketplace.nfts;
+        let nft_length = vector::length(&nfts);
+        let i = 0;
+
+        while (i < nft_length) {
+            let nft = *vector::borrow(&nfts, i);
+            if (nft.collection_name == collection_name &&
+                nft.name == token_name &&
+                nft.owner == user_address) {
+                return option::some(nft);
+            };
+            i = i + 1;
         };
-        (nft.owner, nft.name, nft.description, nft.uri, nft.price, nft.for_sale, nft.sale_type, deadline, highest_bid, offers)
+
+        option::none()
+    }
+
+    // View NFTs Owned by a User
+    #[view]
+    public fun get_user_nfts(
+        owner: address
+    ): vector<NFT> acquires Marketplace {
+        let resources_address = account::create_resource_address(&@marketplace, SEED);
+        let marketplace = borrow_global<Marketplace>(resources_address);
+        let result = vector::empty<NFT>();
+        let i = 0;
+        let nfts_length = vector::length(&marketplace.nfts);
+
+        while (i < nfts_length) {
+            let nft = *vector::borrow(&marketplace.nfts, i);
+            if (nft.owner == owner) {
+                vector::push_back(&mut result, nft);
+            };
+            i = i + 1;
+        };
+
+        result
     }
 
     // View NFTs for Sale
     #[view]
     public fun get_nfts_for_sale(): vector<NFT> acquires Marketplace {
-        let marketplace = borrow_global<Marketplace>(@marketplace);
+        let resources_address = account::create_resource_address(&@marketplace, SEED);
+        let marketplace = borrow_global<Marketplace>(resources_address);
         let result = vector::empty<NFT>();
         let i = 0;
         while (i < vector::length(&marketplace.nfts)) {
             let nft = vector::borrow(&marketplace.nfts, i);
             if (nft.for_sale) {
                 vector::push_back(&mut result, *nft);
-            };
-            i = i + 1;
-        };
-        result
-    }
-
-    // View NFTs Owned by a User
-    #[view]
-    public fun get_user_nfts(owner: address): vector<u64> acquires Marketplace {
-        let marketplace = borrow_global<Marketplace>(@marketplace);
-        let result = vector::empty<u64>();
-        let i = 0;
-        while (i < vector::length(&marketplace.nfts)) {
-            let nft = vector::borrow(&marketplace.nfts, i);
-            if (nft.owner == owner) {
-                vector::push_back(&mut result, nft.id);
             };
             i = i + 1;
         };

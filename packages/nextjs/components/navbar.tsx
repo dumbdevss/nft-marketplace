@@ -99,6 +99,11 @@ export function Navbar() {
                 </Link>
               </NavigationMenuItem>
               <NavigationMenuItem>
+                <Link href="/user" legacyBehavior passHref>
+                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>My Nfts</NavigationMenuLink>
+                </Link>
+              </NavigationMenuItem>
+              <NavigationMenuItem>
                 <Link href="/create" legacyBehavior passHref>
                   <NavigationMenuLink className={navigationMenuTriggerStyle()}>Create</NavigationMenuLink>
                 </Link>
@@ -139,6 +144,15 @@ export function Navbar() {
                 Marketplace
               </Link>
               <Link
+                href="/user"
+                className={cn(
+                  "text-lg font-medium transition-colors hover:text-primary",
+                  pathname === "/marketplace" ? "text-primary" : "text-muted-foreground",
+                )}
+              >
+                My NFTs
+              </Link>
+              <Link
                 href="/create"
                 className={cn(
                   "text-lg font-medium transition-colors hover:text-primary",
@@ -157,10 +171,6 @@ export function Navbar() {
             isSearchOpen ? "flex" : "hidden md:flex",
           )}
         >
-          <div className={cn("flex items-center", isSearchOpen ? "flex-1" : "w-40 lg:w-64")}>
-            <Search className="h-4 w-4 mr-2 shrink-0 opacity-50" />
-            <Input placeholder="Search NFTs..." className="w-full bg-background" />
-          </div>
           <CustomConnectButton />
         
           <Button variant="outline" size="icon" className="md:hidden" onClick={() => setIsSearchOpen(!isSearchOpen)}>

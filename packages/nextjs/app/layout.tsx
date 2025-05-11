@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ScaffoldMoveAppWithProviders } from "~~/components/ScaffoldMoveAppWithProviders";
 import { ThemeProvider } from "~~/components/theme-provider"
+import { Toaster } from "~~/components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,7 +23,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} dark bg-black`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-          <ScaffoldMoveAppWithProviders>{children}</ScaffoldMoveAppWithProviders>
+          <ScaffoldMoveAppWithProviders>
+            <Toaster />
+            {children}
+          </ScaffoldMoveAppWithProviders>
         </ThemeProvider>
       </body>
     </html>

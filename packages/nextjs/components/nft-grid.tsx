@@ -9,30 +9,32 @@ import { Badge } from "~~/components/ui/badge"
 import { Input } from "~~/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~~/components/ui/select"
 import { Search } from "lucide-react"
-import { getNFTs } from "~~/lib/nft-data"
+import { NFT } from "~~/types/nft-types"
 
-export function NFTGrid() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState("recent")
+interface NFTGridProps {
+  nfts: NFT[]
+  searchQuery: string
+  setSearchQuery: (query: string) => void
+  sortBy: string
+  setSortBy: (sort: string) => void
+}
 
-  const nfts = getNFTs()
+export function NFTGrid({ nfts, searchQuery, setSearchQuery, sortBy, setSortBy }: NFTGridProps) {
+  // Convert NFT to displayable format with badges
+  const displayNFTs = nfts.map(nft => {
+    // Determine badge based on properties
+    let badge = null
+    if (nft.sale_type === 1) {
+      badge = "Auction"
+    } else if (Date.now() - nft.created_at < 86400000) { // Less than 24h old
+      badge = "New"
+    }
 
-  const filteredNFTs = nfts.filter(
-    (nft) =>
-      nft.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      nft.collection.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      nft.owner.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-
-  const sortedNFTs = [...filteredNFTs].sort((a, b) => {
-    switch (sortBy) {
-      case "price-low":
-        return a.price - b.price
-      case "price-high":
-        return b.price - a.price
-      case "recent":
-      default:
-        return 0 // In a real app, would sort by date
+    return {
+      ...nft,
+      badge,
+      image: nft.uri, // Use URI as image source
+      collection: nft.collection_name
     }
   })
 
@@ -60,21 +62,20 @@ export function NFTGrid() {
         </Select>
       </div>
 
-      {sortedNFTs.length === 0 ? (
+      {displayNFTs.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">No NFTs found matching your search.</p>
+          <p className="text-muted-foreground">No NFTs found matching your criteria.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedNFTs.map((nft) => (
+          {displayNFTs.map((nft) => (
             <Link href={`/nft/${nft.id}`} key={nft.id} className="group">
               <Card className="overflow-hidden bg-card/50 backdrop-blur-sm border-muted transition-all hover:border-primary">
                 <div className="relative aspect-square">
-                  <Image
-                    src={nft.image || "/placeholder.svg"}
+                  <img
+                    src={nft.image || "/api/placeholder/400/400"}
                     alt={nft.name}
-                    fill
-                    className="object-cover transition-transform group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform hover:scale-105"
                   />
                   {nft.badge && (
                     <Badge className="absolute top-2 right-2 bg-gradient-to-r from-purple-600 to-pink-600">
@@ -90,8 +91,8 @@ export function NFTGrid() {
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <p className="text-sm text-muted-foreground">By {nft.owner}</p>
-                    <p className="font-medium">{nft.price} ETH</p>
+                    <p className="text-sm text-muted-foreground">By {nft.owner.substring(0, 6)}...{nft.owner.substring(nft.owner.length - 4)}</p>
+                    <p className="font-medium">{nft.price / 100000000} MOVE</p>
                   </div>
                   <Button
                     variant="outline"
@@ -109,4 +110,3 @@ export function NFTGrid() {
     </div>
   )
 }
-

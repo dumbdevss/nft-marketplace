@@ -13,5 +13,6 @@ export interface NFT {
   for_sale: boolean;
   sale_type: number; // u8 in original, 0 = direct sale, 1 = auction, etc.
   auction: any;
-  token: string; // Token ID
+  token: any; // Token ID,
+  history: any; // History of transactions
 }
