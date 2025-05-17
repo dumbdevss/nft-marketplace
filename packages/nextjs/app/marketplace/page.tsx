@@ -7,6 +7,7 @@ import { NFTGrid } from "~~/components/nft-grid"
 import { NFTFilters } from "~~/components/nft-filters"
 import { NFT } from "~~/types/nft-types"
 import { Collection } from "~~/types/collection-types"
+import { useView } from "~~/hooks/scaffold-move/useView"
 
 export default function Marketplace() {
   // States for filters
@@ -33,29 +34,28 @@ export default function Marketplace() {
   // States for data
   const [filteredNFTs, setFilteredNFTs] = useState<NFT[]>([])
 
-  // TODO 10: Implement useView hook for fetching collections
+  // Fetch collections data using the useView hook
   const {
     data: collectionsData,
     error: collectionsError,
     isLoading: isLoadingCollections,
     refetch: refetchCollections
-  } = {
-    data: [[]],
-    error: "",
-    isLoading: false
-  }
+  } = useView({
+    moduleName: "NFTMarketplace",
+    functionName: "get_all_collections",
+    args: [10, 0],
+  })
 
-  // TODO 11: Implement useView hook for fetching NFTs for sale
+  // Fetch NFTs for sale using the useView hook
   const {
     data: nftsData,
     error: nftsError,
     isLoading: isLoadingNFTs,
     refetch: refetchNFTs
-  } = {
-    data: [[]],
-    error: "",
-    isLoading: false
-  }
+  } = useView({
+    moduleName: "NFTMarketplace",
+    functionName: "get_nfts_for_sale",
+  })
 
   // Parse collection data using useMemo to prevent unnecessary recalculations
   const collections = useMemo(() => {
@@ -71,19 +71,80 @@ export default function Marketplace() {
       []
   }, [nftsData])
 
- // TODO 12: Implement NFT filtering and sorting logic
-  
+  // Apply filters whenever filter state changes or data updates
   useEffect(() => {
-    // Check if allNFTs is empty and set filteredNFTs to empty array if so
-    // Create a copy of allNFTs to avoid mutating original data
-    // Apply search filter based on searchQuery for name, collection_name, or owner
-    // Apply category filters based on active categoryFilters
-    // Apply status filters for buyNow, onAuction, newItem, and hasOffers
-    // Apply collection filters based on active collectionFilters
-    // Apply price range filter using priceRange
-    // Sort filtered NFTs based on sortBy (price-low, price-high, or recent)
-    // Update filteredNFTs state with the filtered and sorted array
-    
+    if (!allNFTs.length) {
+      setFilteredNFTs([])
+      return
+    }
+
+    let filtered = [...allNFTs]
+
+    // Apply search filter
+    if (searchQuery && searchQuery.trim() !== "") {
+      filtered = filtered.filter(
+        (nft) =>
+          nft.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          nft.collection_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          nft.owner.toLowerCase().includes(searchQuery.toLowerCase().replace("0x", ""))
+      )
+    }
+
+    // Apply category filters
+    const activeCategoryFilters = Object.entries(categoryFilters).filter(([_, isActive]) => isActive)
+    if (activeCategoryFilters.length > 0) {
+      filtered = filtered.filter(nft => {
+        const category = nft.category.toLowerCase()
+        return activeCategoryFilters.some(([key, _]) => {
+          return category === key
+        })
+      })
+    }
+
+    // Apply status filters
+    if (statusFilters.buyNow) {
+      filtered = filtered.filter(nft => nft.sale_type === 0 && nft.for_sale)
+    }
+    if (statusFilters.onAuction) {
+      filtered = filtered.filter(nft => nft.sale_type === 1 && nft.for_sale)
+    }
+    if (statusFilters.newItem) {
+      // Consider items created in the last 24 hours as new
+      const oneDayAgo = Date.now() - 86400000
+      filtered = filtered.filter(nft => nft.created_at > oneDayAgo)
+    }
+    if (statusFilters.hasOffers) {
+      filtered = filtered.filter(nft => nft.auction && nft.auction?.vec?.length > 0)
+    }
+
+    // Apply collection filters
+    const activeCollectionFilters = Object.entries(collectionFilters).filter(([_, isActive]) => isActive)
+    if (activeCollectionFilters.length > 0) {
+      filtered = filtered.filter(nft => {
+        const collection = nft.collection_name.toLowerCase().replace(/\s+/g, '')
+        return activeCollectionFilters.some(([key, _]) => {
+          return collection.includes(key?.toLowerCase().replace(/\s+/g, ''))
+        })
+      })
+    }
+    filtered = filtered.filter(nft => (nft.price / 100000000) >= priceRange[0] && (nft.price / 100000000) <= priceRange[1])
+
+
+    // Apply sorting
+    switch (sortBy) {
+      case "price-low":
+        filtered.sort((a, b) => a.price - b.price)
+        break
+      case "price-high":
+        filtered.sort((a, b) => b.price - a.price)
+        break
+      case "recent":
+      default:
+        filtered.sort((a, b) => b.created_at - a.created_at)
+        break
+    }
+
+    setFilteredNFTs(filtered)
   }, [allNFTs, searchQuery, categoryFilters, statusFilters, collectionFilters, priceRange, sortBy])
 
   return (
@@ -103,7 +164,10 @@ export default function Marketplace() {
             <div className="text-center py-20">
               <p className="text-red-500">Error loading marketplace data. Please try again.</p>
               <button
-                onClick={() => {}} // TODO 13: Implement retry functionality
+                onClick={() => {
+                  refetchCollections();
+                  refetchNFTs();
+                }}
                 className="mt-4 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80"
               >
                 Retry
