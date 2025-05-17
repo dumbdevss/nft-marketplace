@@ -11,80 +11,86 @@ module marketplace::NFTMarketplace {
     use aptos_framework::timestamp;
     use aptos_framework::account;
 
-    // Constants
-    const SEED: vector<u8> = b"marketplace_funds";
-    const MARKETPLACE_FEE_PERCENT: u64 = 5;
-    const CANCEL_FEE_PERCENT: u64 = 45; // 4.5% represented as 45/1000 for precision
+    // TODOs 1: set the constants which include seed, marketplace_fee_percentage, cancel_fee_percentage
+    const SEED: vector<u8> = b"";
+    const MARKETPLACE_FEE_PERCENT: u64 = 0 // represent in 100%;
+    const CANCEL_FEE_PERCENT: u64 = 0; // represented as /1000 for precision
 
-    // Error codes
-    const E_NOT_AUTHORIZED: u64 = 301;
-    const E_NOT_OWNER: u64 = 100;
-    const E_ALREADY_LISTED: u64 = 101;
-    const E_INVALID_PRICE: u64 = 102;
-    const E_NOT_FOR_SALE: u64 = 200;
-    const E_INSUFFICIENT_BALANCE: u64 = 201;
-    const E_SAME_OWNER: u64 = 302;
-    const E_NFT_NOT_FOUND: u64 = 303;
-    const E_INVALID_DEADLINE: u64 = 304;
-    const E_AUCTION_NOT_ENDED: u64 = 305;
-    const E_AUCTION_ENDED: u64 = 306;
-    const E_NOT_AUCTION: u64 = 307;
-    const E_INVALID_OFFER: u64 = 308;
-    const E_INVALID_SALE_TYPE: u64 = 309;
-    const E_NO_SIGNER_CAP: u64 = 310;
+    // TODOs 2:  define the error code you want to use
+    const E_NOT_AUTHORIZED: u64 = 0;
+    const E_NOT_OWNER: u64 = 0;
+    const E_ALREADY_LISTED: u64 = 0;
+    const E_INVALID_PRICE: u64 = 0;
+    const E_NOT_FOR_SALE: u64 = 0;
+    const E_INSUFFICIENT_BALANCE: u64 = 0;
+    const E_SAME_OWNER: u64 = 0;
+    const E_NFT_NOT_FOUND: u64 = 0;
+    const E_INVALID_DEADLINE: u64 = 0;
+    const E_AUCTION_NOT_ENDED: u64 = 0;
+    const E_AUCTION_ENDED: u64 = 0;
+    const E_NOT_AUCTION: u64 = 0;
+    const E_INVALID_OFFER: u64 = 0;
+    const E_INVALID_SALE_TYPE: u64 = 0;
+    const E_NO_SIGNER_CAP: u64 = 0;
 
     // Sale types
     const SALE_TYPE_INSTANT: u8 = 0;
     const SALE_TYPE_AUCTION: u8 = 1;
 
-    // Offer Structure
+    /* TODOs 3: Define the Offer data structure
+     * @bidder      Address of the bidder
+     * @amount      Bid amount in AptosCoin
+     * @timestamp   Time when the offer was made
+     */
     struct Offer has store, drop, copy {
-        bidder: address,
-        amount: u64,
-        timestamp: u64,
     }
 
-    // Auction Structure
+    /* TODOs 4: Define the Auction data structure
+     * @deadline        Optional timestamp when auction ends
+     * @offers          Vector of offers made
+     * @highest_bid     Current highest bid amount
+     * @highest_bidder  Optional address of highest bidder
+     */
     struct Auction has store, drop, copy {
-        deadline: option::Option<u64>,
-        offers: vector<Offer>,
-        highest_bid: u64,
-        highest_bidder: option::Option<address>,
     }
 
-    // Collection Structure
+    /* TODOs 5: Define the Collection data structure
+     * @name        Name of the collection
+     * @description Description of the collection
+     * @uri         URI for collection metadata
+     * @creator     Address of the collection creator
+     */
     struct Collection has copy, drop, store {
-        name: String,
-        description: String,
-        uri: String,
-        creator: address
     }
 
-    // NFT Structure
+    /* TODOs 6: Define the NFT data structure
+     * @id              Unique identifier for the NFT
+     * @owner           Current owner address
+     * @creator         Creator address
+     * @created_at      Timestamp of creation
+     * @category        Category of the NFT
+     * @collection_name Name of the collection
+     * @name            Name of the NFT
+     * @description     Description of the NFT
+     * @uri             URI for NFT metadata
+     * @price           Current price if for sale
+     * @for_sale        Whether the NFT is listed for sale
+     * @sale_type       Type of sale (instant or auction)
+     * @auction         Optional auction details
+     * @token           Token object reference
+     * @history         Vector of ownership history
+     */
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct NFT has store, key, copy, drop {
-        id: u64,
-        owner: address,
-        creator: address,
-        created_at: u64,
-        category: String,
-        collection_name: String,
-        name: String,
-        description: String,
-        uri: String,
-        price: u64,
-        for_sale: bool,
-        sale_type: u8,
-        auction: option::Option<Auction>,
-        token: Object<Token>,
-        history: vector<History>,
     }
 
+    /* TODOs 7: Define the History data structure
+     * @new_owner   Address of the new owner
+     * @seller      Address of the seller
+     * @amount      Sale amount
+     * @timestamp   Time of the transaction
+     */
     struct History has store, drop, copy {
-        new_owner: address,
-        seller: address,
-        amount: u64,
-        timestamp: u64,
     }
 
     // Transfer Reference for NFT
@@ -103,50 +109,45 @@ module marketplace::NFTMarketplace {
         nfts: vector<NFT>,
     }
 
+    // Collections Structure
     struct Collections has key {
         collections: vector<Collection>
     }
 
-    // Initialize Marketplace
+    /* TODOs 8: Initialize the marketplace
+     * - Create a resource account with the provided SEED
+     * - Register AptosCoin for the resource account
+     * - Initialize Marketplace with empty NFTs vector
+     * - Store MarketplaceFunds with signer capability
+     * - Initialize Collections with empty collections vector
+     */
     fun init_module(account: &signer) {
-        let (resource_signer, signer_cap) = account::create_resource_account(account, SEED);
-        coin::register<AptosCoin>(&resource_signer);
-        move_to(&resource_signer, Marketplace {
-            nfts: vector::empty<NFT>()
-        });
-        move_to(account, MarketplaceFunds {
-            signer_cap
-        });
-        move_to(account, Collections {
-            collections: vector::empty<Collection>()
-        })
     }
 
-    // Initialize Collection
+    /* TODOs 9: Initialize a new collection
+     * - Get mutable reference to Collections resource
+     * - Create a new Collection struct with provided details
+     * - Add collection to collections vector
+     * - Create an unlimited collection using aptos_token_objects::collection
+     */
     public entry fun initialize_collection(
         creator: &signer,
         name: String,
         description: String,
         uri: String
     ) acquires Collections {
-        let collections = borrow_global_mut<Collections>(@marketplace);
-        let collection = Collection {
-            description,
-            name,
-            uri,
-            creator: signer::address_of(creator)
-        };
-        vector::push_back(&mut collections.collections, collection);
-        collection::create_unlimited_collection(
-            creator,
-            description,
-            name,
-            option::none(),
-            uri
-        );
     }
 
-    // Mint an NFT
+    /* TODOs 9: Mint a new NFT
+     * - Get resource account address
+     * - Get Collections and mutable Marketplace resources
+     * - Check if collection exists; if not, initialize it
+     * - Create a named token using aptos_token_objects::token
+     * - Generate token signer and transfer reference
+     * - Create NFT struct with provided details
+     * - Add NFT to marketplace NFTs vector
+     * - Store PermissionRef with transfer reference
+     */
     public entry fun mint_nft(
         creator: &signer,
         collection_name: String,
@@ -157,64 +158,17 @@ module marketplace::NFTMarketplace {
         category: String,
         uri: String
     ) acquires Marketplace, Collections {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let collections = borrow_global<Collections>(@marketplace);
-        let marketplace = borrow_global_mut<Marketplace>(resources_address);
-
-        // Check if collection exists, if not initialize it
-        let coll_desc = option::extract(&mut collection_description);
-        let coll_uri = option::extract(&mut collection_uri);
-
-        let collection_exists = false;
-        let i = 0;
-        while (i < vector::length(&collections.collections)) {
-            let collection = vector::borrow(&collections.collections, i);
-            if (collection.name == collection_name) {
-                collection_exists = true;
-                break;
-            };
-            i = i + 1;
-        };
-        if (!collection_exists) {
-            initialize_collection(creator, collection_name, coll_desc, coll_uri);
-        };
-
-        let token_constructor_ref = token::create_named_token(
-            creator,
-            collection_name,
-            description,
-            name,
-            option::none(),
-            uri,
-        );
-
-        let token_signer = object::generate_signer(&token_constructor_ref);
-        let transfer_ref = object::generate_transfer_ref(&token_constructor_ref);
-        let token_object = object::object_from_constructor_ref<Token>(&token_constructor_ref);
-
-        let nft = NFT {
-            id: vector::length(&marketplace.nfts),
-            owner: signer::address_of(creator),
-            creator: signer::address_of(creator),
-            created_at: timestamp::now_seconds(),
-            category,
-            collection_name,
-            name,
-            description,
-            uri,
-            price: 0,
-            for_sale: false,
-            sale_type: SALE_TYPE_INSTANT,
-            auction: option::none(),
-            token: token_object,
-            history: vector::empty<History>(),
-        };
-
-        vector::push_back(&mut marketplace.nfts, nft);
-        move_to(&token_signer, PermissionRef { transfer_ref });
     }
 
-    // List NFT for Sale (Instant or Auction)
+    /* TODOs 10: List an NFT for sale
+     * - Get mutable Marketplace resource
+     * - Verify NFT exists and owner is caller
+     * - Ensure NFT is not already listed
+     * - Validate sale type (instant or auction)
+     * - If auction, validate deadline is in future
+     * - Update NFT fields: for_sale, sale_type, price
+     * - If auction, initialize Auction struct
+     */
     public entry fun list_nft_for_sale(
         owner: &signer,
         nft_id: u64,
@@ -222,205 +176,74 @@ module marketplace::NFTMarketplace {
         sale_type: u8,
         auction_deadline: option::Option<u64>
     ) acquires Marketplace {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global_mut<Marketplace>(resources_address);
-        assert!(nft_id < vector::length(&marketplace.nfts), E_NFT_NOT_FOUND);
-        let nft = vector::borrow_mut(&mut marketplace.nfts, nft_id);
-
-        assert!(nft.owner == signer::address_of(owner), E_NOT_OWNER);
-        assert!(!nft.for_sale, E_ALREADY_LISTED);
-        assert!(sale_type == SALE_TYPE_INSTANT || sale_type == SALE_TYPE_AUCTION, E_INVALID_SALE_TYPE);
-        if (option::is_some(&auction_deadline)) {
-            assert!(*option::borrow(&auction_deadline) > timestamp::now_seconds(), E_INVALID_DEADLINE);
-        };
-
-        nft.for_sale = true;
-        nft.sale_type = sale_type;
-        nft.price = price;
-
-        if (sale_type == SALE_TYPE_AUCTION) {
-            nft.auction = option::some(Auction {
-                deadline: auction_deadline,
-                offers: vector::empty<Offer>(),
-                highest_bid: 0,
-                highest_bidder: option::none(),
-            });
-        };
     }
 
-    // Place an Offer for an Auction
+    /* TODOs 11: Place an offer for an auction
+     * - Get mutable Marketplace and MarketplaceFunds resources
+     * - Verify NFT exists, is for sale, and is an auction
+     * - Check auction hasn't ended if deadline exists
+     * - Ensure offer amount is higher than current highest bid and minimum price
+     * - Verify bidder has sufficient balance including fee
+     * - Get resource account signer
+     * - Refund previous highest bidder if exists
+     * - Transfer bidder's coins to resource account
+     * - Create and store Offer struct
+     * - Update auction's highest bid and bidder
+     */
     public entry fun place_offer(
         bidder: &signer,
         nft_id: u64,
         amount: u64
     ) acquires Marketplace, MarketplaceFunds {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global_mut<Marketplace>(resources_address);
-        assert!(nft_id < vector::length(&marketplace.nfts), E_NFT_NOT_FOUND);
-        let nft = vector::borrow_mut(&mut marketplace.nfts, nft_id);
-
-        assert!(nft.for_sale, E_NOT_FOR_SALE);
-        assert!(nft.sale_type == SALE_TYPE_AUCTION, E_NOT_AUCTION);
-        let auction = option::borrow_mut(&mut nft.auction);
-        if (option::is_some(&auction.deadline)) {
-            assert!(timestamp::now_seconds() < *option::borrow(&auction.deadline), E_AUCTION_ENDED);
-        };
-        assert!(amount > nft.price && amount > auction.highest_bid, E_INVALID_OFFER);
-
-        let amount_to_pay = amount + ((amount * MARKETPLACE_FEE_PERCENT) / 100);
-
-        let bidder_addr = signer::address_of(bidder);
-        assert!(coin::balance<AptosCoin>(bidder_addr) >= amount_to_pay, E_INSUFFICIENT_BALANCE);
-
-        // Get resource account
-        let funds = borrow_global<MarketplaceFunds>(@marketplace);
-        let resource_signer = account::create_signer_with_capability(&funds.signer_cap);
-        let resource_addr = account::get_signer_capability_address(&funds.signer_cap);
-
-        // Refund previous highest bidder if exists
-        if (option::is_some(&auction.highest_bidder) && *option::borrow(&auction.highest_bidder) != bidder_addr) {
-            let previous_bidder = *option::borrow(&auction.highest_bidder);
-            let previous_bid = auction.highest_bid;
-            let refund_amount = previous_bid + ((previous_bid * CANCEL_FEE_PERCENT) / 100);
-            assert!(coin::balance<AptosCoin>(resource_addr) >= refund_amount, E_INSUFFICIENT_BALANCE);
-            coin::transfer<AptosCoin>(&resource_signer, previous_bidder, refund_amount);
-        };
-
-        // Lock bidder's coins in resource account
-        coin::transfer<AptosCoin>(bidder, resource_addr, amount_to_pay);
-
-        let offer = Offer {
-            bidder: bidder_addr,
-            amount,
-            timestamp: timestamp::now_seconds(),
-        };
-        vector::push_back(&mut auction.offers, offer);
-
-        auction.highest_bid = amount;
-        auction.highest_bidder = option::some(bidder_addr);
     }
 
-    // Finalize Auction
+    /* TODOs 12: Finalize an auction
+     * - Get mutable Marketplace, PermissionRef, and MarketplaceFunds resources
+     * - Verify NFT exists, owner is caller, is for sale, and is an auction
+     * - Check auction has ended if deadline exists
+     * - Get resource account signer
+     * - If there's a highest bidder:
+     *   - Transfer payment to seller
+     *   - Transfer NFT to winner
+     *   - Update NFT owner
+     * - Update NFT: clear sale status, price, auction
+     * - Record transaction in history
+     */
     public entry fun finalize_auction(
         owner: &signer,
         nft_id: u64
     ) acquires Marketplace, PermissionRef, MarketplaceFunds {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global_mut<Marketplace>(resources_address);
-        assert!(nft_id < vector::length(&marketplace.nfts), E_NFT_NOT_FOUND);
-        let nft = vector::borrow_mut(&mut marketplace.nfts, nft_id);
-
-        assert!(nft.owner == signer::address_of(owner), E_NOT_OWNER);
-        assert!(nft.for_sale, E_NOT_FOR_SALE);
-        assert!(nft.sale_type == SALE_TYPE_AUCTION, E_NOT_AUCTION);
-        let auction = option::borrow(&nft.auction);
-        if (option::is_some(&auction.deadline)) {
-            assert!(timestamp::now_seconds() >= *option::borrow(&auction.deadline), E_AUCTION_NOT_ENDED);
-        };
-
-        let funds = borrow_global<MarketplaceFunds>(@marketplace);
-        let resource_signer = account::create_signer_with_capability(&funds.signer_cap);
-        let resource_addr = account::get_signer_capability_address(&funds.signer_cap);
-
-        if (option::is_some(&auction.highest_bidder)) {
-            let winner = *option::borrow(&auction.highest_bidder);
-            let amount = auction.highest_bid;
-
-            // Transfer payment to seller and fee to marketplace
-            coin::transfer<AptosCoin>(&resource_signer, nft.owner, amount);
-
-            // Transfer NFT to winner
-            let token = nft.token;
-            let permission_ref = borrow_global<PermissionRef>(object::object_address(&token));
-            let linear_transfer_ref = object::generate_linear_transfer_ref(&permission_ref.transfer_ref);
-            object::transfer_with_ref(linear_transfer_ref, winner);
-
-            nft.owner = winner;
-        };
-
-        nft.for_sale = false;
-        vector::push_back(&mut nft.history, History {
-            new_owner: nft.owner,
-            seller: signer::address_of(owner),
-            amount: auction.highest_bid,
-            timestamp: timestamp::now_seconds(),
-        });
-        nft.price = 0;
-        nft.sale_type = SALE_TYPE_INSTANT;
-        nft.auction = option::none();
     }
 
-    // Purchase NFT (Instant Sale Only)
+    /* TODOs 13: Purchase an NFT (instant sale)
+     * - Get mutable Marketplace, PermissionRef, and MarketplaceFunds resources
+     * - Verify NFT exists, is for sale, and is instant sale
+     * - Calculate fee and seller amount
+     * - Verify buyer has sufficient balance
+     * - Get resource account address
+     * - Transfer payment to seller and fee to resource account
+     * - Transfer NFT to buyer
+     * - Update NFT: owner, clear sale status, price, auction
+     * - Record transaction in history
+     */
     public entry fun purchase_nft(
         buyer: &signer,
         nft_id: u64
     ) acquires Marketplace, PermissionRef, MarketplaceFunds {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global_mut<Marketplace>(resources_address);
-        assert!(nft_id < vector::length(&marketplace.nfts), E_NFT_NOT_FOUND);
-        let nft = vector::borrow_mut(&mut marketplace.nfts, nft_id);
-
-        assert!(nft.for_sale, E_NOT_FOR_SALE);
-        assert!(nft.sale_type == SALE_TYPE_INSTANT, E_NOT_AUCTION);
-        let price = nft.price;
-        let fee = (price * MARKETPLACE_FEE_PERCENT) / 100;
-        let seller_amount = price - fee;
-
-        let buyer_addr = signer::address_of(buyer);
-        let seller_addr = nft.owner;
-
-        assert!(coin::balance<AptosCoin>(buyer_addr) >= price, E_INSUFFICIENT_BALANCE);
-
-        let funds = borrow_global<MarketplaceFunds>(@marketplace);
-        let resource_addr = account::get_signer_capability_address(&funds.signer_cap);
-
-        // Transfer payment to seller and resource account for fee
-        coin::transfer<AptosCoin>(buyer, seller_addr, seller_amount);
-        coin::transfer<AptosCoin>(buyer, resource_addr, fee);
-
-        // Transfer NFT to buyer
-        let token = nft.token;
-        let permission_ref = borrow_global<PermissionRef>(object::object_address(&token));
-        let linear_transfer_ref = object::generate_linear_transfer_ref(&permission_ref.transfer_ref);
-        object::transfer_with_ref(linear_transfer_ref, buyer_addr);
-
-        nft.owner = buyer_addr;
-        nft.for_sale = false;
-        vector::push_back(&mut nft.history, History {
-            new_owner: buyer_addr,
-            seller: seller_addr,
-            amount: price,
-            timestamp: timestamp::now_seconds(),
-        });
-        nft.price = 0;
-        nft.sale_type = SALE_TYPE_INSTANT;
-        nft.auction = option::none();
     }
 
-    // Transfer NFT
+    /* TODOs 14: Transfer an NFT
+     * - Get mutable Marketplace and PermissionRef resources
+     * - Verify NFT exists and owner is caller
+     * - Ensure new owner is different
+     * - Transfer NFT to new owner
+     * - Update NFT: owner, clear sale status, price, auction
+     */
     public entry fun transfer_nft(
         owner: &signer,
         nft_id: u64,
         new_owner: address
     ) acquires Marketplace, PermissionRef {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global_mut<Marketplace>(resources_address);
-        assert!(nft_id < vector::length(&marketplace.nfts), E_NFT_NOT_FOUND);
-        let nft = vector::borrow_mut(&mut marketplace.nfts, nft_id);
-
-        assert!(nft.owner == signer::address_of(owner), E_NOT_OWNER);
-        assert!(nft.owner != new_owner, E_SAME_OWNER);
-
-        let token = nft.token;
-        let permission_ref = borrow_global<PermissionRef>(object::object_address(&token));
-        let linear_transfer_ref = object::generate_linear_transfer_ref(&permission_ref.transfer_ref);
-        object::transfer_with_ref(linear_transfer_ref, new_owner);
-
-        nft.owner = new_owner;
-        nft.for_sale = false;
-        nft.price = 0;
-        nft.sale_type = SALE_TYPE_INSTANT;
-        nft.auction = option::none();
     }
 
     // Update NFT Metadata
@@ -441,70 +264,36 @@ module marketplace::NFTMarketplace {
         nft.uri = uri;
     }
 
-    // Cancel Listing
+    /* TODOs 15: Cancel an NFT listing
+     * - Get mutable Marketplace and MarketplaceFunds resources
+     * - Verify NFT exists, owner is caller, and is for sale
+     * - If auction with a highest bidder:
+     *   - Calculate refund amount with cancellation fee
+     *   - Get resource account signer
+     *   - Transfer refund to bidder
+     * - Update NFT: clear sale status, price, auction
+     */
     public entry fun cancel_listing(owner: &signer, nft_id: u64) acquires Marketplace, MarketplaceFunds {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global_mut<Marketplace>(resources_address);
-        assert!(nft_id < vector::length(&marketplace.nfts), E_NFT_NOT_FOUND);
-        let nft = vector::borrow_mut(&mut marketplace.nfts, nft_id);
-        assert!(nft.owner == signer::address_of(owner), E_NOT_OWNER);
-        assert!(nft.for_sale, E_NOT_FOR_SALE);
-
-        // If auction, refund the highest bidder with 4.5% fee
-        if (nft.sale_type == SALE_TYPE_AUCTION && option::is_some(&nft.auction)) {
-            let auction = option::borrow(&nft.auction);
-            if (option::is_some(&auction.highest_bidder)) {
-                let bidder = *option::borrow(&auction.highest_bidder);
-                let bid_amount = auction.highest_bid;
-                let refund_fee = (bid_amount * CANCEL_FEE_PERCENT) / 1000; // 4.5% fee
-                let refund_amount = bid_amount + refund_fee;
-
-                let funds = borrow_global<MarketplaceFunds>(@marketplace);
-                let resource_signer = account::create_signer_with_capability(&funds.signer_cap);
-                let resource_addr = account::get_signer_capability_address(&funds.signer_cap);
-
-                assert!(coin::balance<AptosCoin>(resource_addr) >= refund_amount, E_INSUFFICIENT_BALANCE);
-                coin::transfer<AptosCoin>(&resource_signer, bidder, refund_amount);
-            };
-        };
-
-        nft.for_sale = false;
-        nft.price = 0;
-        nft.sale_type = SALE_TYPE_INSTANT;
-        nft.auction = option::none();
     }
 
-    // Get All Collections by User
+    /* TODOs 16: Get all collections by user
+     * - Get Collections resource
+     * - Iterate through collections within limit and offset
+     * - Collect collections created by the specified user
+     * - Return vector of matching collections
+     */
     #[view]
     public fun get_all_collections_by_user(account: address, limit: u64, offset: u64): vector<Collection> acquires Collections {
-        let collections = borrow_global<Collections>(@marketplace);
-        let result = vector::empty<Collection>();
-        let len = vector::length(&collections.collections);
-        let end = if (offset + limit < len) { offset + limit } else { len };
-        let i = offset;
-        while (i < end) {
-            let collection = vector::borrow(&collections.collections, i);
-            if(collection.creator == account) {
-                vector::push_back(&mut result, *collection);
-            };
-            i = i + 1;
-        };
-        result
     }
 
-    // Get All Collections by User
+    /* TODOs 17: Get all collections
+     * - Get Collections resource
+     * - Iterate through collections within limit and offset
+     * - Collect all collections
+     * - Return vector of collections
+     */
     #[view]
     public fun get_all_collections(limit: u64, offset: u64): vector<Collection> acquires Collections {
-        let collections = borrow_global<Collections>(@marketplace);
-        let result = vector::empty<Collection>();
-        let len = vector::length(&collections.collections);
-        let end = if (offset + limit < len) { offset + limit } else { len };
-        let i = offset;
-        while (i < end) {
-            vector::push_back(&mut result, *vector::borrow(&collections.collections, i));
-            i = i + 1;
-        };
-        result
     }
 
     // View NFT Details
@@ -517,68 +306,39 @@ module marketplace::NFTMarketplace {
         *nft
     }
 
-    // View NFT Details
+    /* TODOs 18: Get NFT by collection and token name
+     * - Get Marketplace resource
+     * - Iterate through NFTs
+     * - Find NFT matching collection name, token name, and owner
+     * - Return optional NFT if found, none otherwise
+     */
     #[view]
     public fun get_nft_by_collection_name_and_token_name(
         collection_name: String,
         token_name: String,
         user_address: address
     ): option::Option<NFT> acquires Marketplace {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global<Marketplace>(resources_address);
-        let nfts = marketplace.nfts;
-        let nft_length = vector::length(&nfts);
-        let i = 0;
-
-        while (i < nft_length) {
-            let nft = *vector::borrow(&nfts, i);
-            if (nft.collection_name == collection_name &&
-                nft.name == token_name &&
-                nft.owner == user_address) {
-                return option::some(nft);
-            };
-            i = i + 1;
-        };
-
-        option::none()
     }
 
-    // View NFTs Owned by a User
+    /* TODOs 19: Get NFTs owned by a user
+     * - Get Marketplace resource
+     * - Iterate through NFTs
+     * - Collect NFTs owned by the specified user into a vector
+     * - Return vector of matching NFTs
+     */
     #[view]
     public fun get_user_nfts(
         owner: address
     ): vector<NFT> acquires Marketplace {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global<Marketplace>(resources_address);
-        let result = vector::empty<NFT>();
-        let i = 0;
-        let nfts_length = vector::length(&marketplace.nfts);
-
-        while (i < nfts_length) {
-            let nft = *vector::borrow(&marketplace.nfts, i);
-            if (nft.owner == owner) {
-                vector::push_back(&mut result, nft);
-            };
-            i = i + 1;
-        };
-
-        result
     }
 
-    // View NFTs for Sale
+    /* TODOs 20: Get NFTs for sale
+     * - Get Marketplace resource
+     * - Iterate through NFTs
+     * - Collect NFTs that are for sale
+     * - Return vector of matching NFTs
+     */
     #[view]
     public fun get_nfts_for_sale(): vector<NFT> acquires Marketplace {
-        let resources_address = account::create_resource_address(&@marketplace, SEED);
-        let marketplace = borrow_global<Marketplace>(resources_address);
-        let result = vector::empty<NFT>();
-        let i = 0;
-        while (i < vector::length(&marketplace.nfts)) {
-            let nft = vector::borrow(&marketplace.nfts, i);
-            if (nft.for_sale) {
-                vector::push_back(&mut result, *nft);
-            };
-            i = i + 1;
-        };
-        result
     }
 }

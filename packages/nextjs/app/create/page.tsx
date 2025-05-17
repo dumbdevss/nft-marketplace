@@ -12,10 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~~/components/ui/dialog"
 import Receipt from "~~/components/receipt"
 import { Upload, Plus, Loader2 } from "lucide-react"
-import { useView } from "~~/hooks/scaffold-move/useView"
 import { useWallet } from "@aptos-labs/wallet-adapter-react"
-import useSubmitTransaction from "~~/hooks/scaffold-move/useSubmitTransaction"
 import { NFT } from "~~/types/nft-types"
+
+// TODOs 1: Configure Pinata API key, API secret, Pinata gateway URL
+const PINATA_API_KEY = ""
+const PINATA_API_SECRET = ""
+const PINATA_GATEWAY = ""
 
 export default function CreateNFT() {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -38,39 +41,31 @@ export default function CreateNFT() {
   const [hash, setHash] = useState<string | null>(null)
   const [mintedNFT, setMintedNFT] = useState<NFT | null>(null)
 
-  const { account } = useWallet()
-  const { submitTransaction, transactionInProcess, transactionResponse } = useSubmitTransaction("NFTMarketplace")
+  const { account } = useWallet();
+  // TODOs 2: Using useSubmitTransaction hook get the submitTransaction function and transactionInProcess
 
-  // Pinata API credentials - in a real app, these should be environment variables
-  const PINATA_API_KEY = process.env.NEXT_PUBLIC_PINATA_API_KEY
-  const PINATA_API_SECRET = process.env.NEXT_PUBLIC_PINATA_API_SECRET
-  const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gateway.pinata.cloud/ipfs/"
-
-  const { data, error, isLoading, refetch } = useView({
-    moduleName: "NFTMarketplace",
-    functionName: "get_all_collections_by_user",
-    args: [account?.address as `0x${string}`, 10, 0],
-  })
+  // TODOs 3: Implement useView hook for fetching user collections
+  const { data, error, isLoading, refetch } = {
+    data: [[]],
+    error: "",
+    isLoading: false,
+    refetch: () => {}
+  }
 
   const collections = data?.[0] || []
-  
-  // State for temporarily storing NFT collection and name for fetching after minting
-  const [mintedNFTInfo, setMintedNFTInfo] = useState<{collection: string, name: string} | null>(null)
-  
-  // This hook fetches NFT data for display in the receipt
+
+  // TODOs 4: Implement useView hook for fetching minted NFT data
   const { 
     data: fetchedNFTData, 
     refetch: refetchNFT 
-  } = useView({
-    moduleName: "NFTMarketplace",
-    functionName: "get_nft_by_collection_name_and_token_name",
-    args: [
-      mintedNFTInfo?.collection || "",
-      mintedNFTInfo?.name || "",
-      account?.address as `0x${string}` || ""
-    ],
-  })
-  
+  } = {
+    data: [[]],
+    refetch: () => {}
+  }
+
+  // State for temporarily storing NFT collection and name for fetching after minting
+  const [mintedNFTInfo, setMintedNFTInfo] = useState<{collection: string, name: string} | null>(null)
+
   // Effect to update mintedNFT when fetchedNFTData changes
   useEffect(() => {
     if (fetchedNFTData?.[0]?.vec?.[0]) {
@@ -78,77 +73,32 @@ export default function CreateNFT() {
     }
   }, [fetchedNFTData])
 
+  // TODOs 5: Implement handleImageChange function
+  /*
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUploadingFile(true)
-    const file = e.target.files?.[0]
-    if (file) {
-      // In a real implementation, you would upload this to IPFS or another storage
-      // and get back a URL. For now, we'll create a local object URL
-      const formData = new FormData()
-      formData.append("file", file)
-
-      const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-        method: "POST",
-        headers: {
-          "pinata_api_key": PINATA_API_KEY || "",
-          "pinata_secret_api_key": PINATA_API_SECRET || "",
-        },
-        body: formData,
-      })
-
-      const data = await response.json()
-      console.log(data)
-      const ipfsHash = data.IpfsHash
-      const fileUrl = `${PINATA_GATEWAY}/ipfs/${ipfsHash}`
-      const imageUrl = URL.createObjectURL(file)
-      setPreviewImage(imageUrl)
-      setFileUrl(fileUrl) // This would be a real IPFS URL in production
-      setUploadingFile(false)
-    }
+    // 1. Set uploading state to true
+    // 2. Get the selected file
+    // 3. Create FormData and append the file
+    // 4. Make API call to Pinata to upload file to IPFS
+    // 5. Get IPFS hash and construct file URL
+    // 6. Create local object URL for preview
+    // 7. Update state with preview and file URLs
+    // 8. Set uploading state to false
   }
+  */
 
+  // TODOs 6: Implement mintNFT function
+  /*
   const mintNFT = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    try {
-      // The smart contract handles collection initialization internally
-      // We just need to pass all the data in one call
-      const finalCollectionName = collectionChoice === "new" ? newCollectionData.name : nftData.collection
-      const collectionDescription = collectionChoice === "new" ? newCollectionData.description : "null"
-      const collectionUri = collectionChoice === "new" ? newCollectionData.uri : "null"
-      const finalTokenName = nftData.name
-
-      let response = await submitTransaction("mint_nft", [
-        finalCollectionName,
-        collectionDescription,
-        collectionUri,
-        finalTokenName,
-        nftData.description,
-        nftData.category,
-        fileUrl
-      ])
-      
-      setHash(response)
-      
-          // Update the mintedNFTInfo state to trigger the useView hook
-      setMintedNFTInfo({
-        collection: finalCollectionName,
-        name: finalTokenName
-      })
-      
-      // Wait a moment for blockchain to process before fetching the NFT data
-      setTimeout(async () => {
-        // Use the refetchNFT function to get the latest data
-        const result = await refetchNFT()
-        
-        // After refetching, set the data and show receipt
-        setShowReceipt(true)
-      }, 2000)
-    } catch (error) {
-      console.error("Failed to mint NFT:", error)
-    }
+    // 1. Prevent default form submission
+    // 2. Determine collection name, description, and URI based on collection choice
+    // 3. Submit transaction to mint NFT with provided data
+    // 4. Update mintedNFTInfo state to trigger NFT data fetch
+    // 5. Wait for blockchain processing and refetch NFT data
+    // 6. Show receipt dialog
+    // 7. Handle any errors
   }
-
+  */
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-background/80">
@@ -159,7 +109,7 @@ export default function CreateNFT() {
 
           <Card className="bg-card/50 backdrop-blur-sm border-muted">
             <CardContent className="pt-6">
-              <form onSubmit={mintNFT} className="space-y-6">
+              <form onSubmit={() => {}} className="space-y-6">
                 {/* Image Upload */}
                 <div className="space-y-2">
                   <Label htmlFor="image">Upload Image</Label>
@@ -207,7 +157,7 @@ export default function CreateNFT() {
                             type="file"
                             className="absolute inset-0 opacity-0 cursor-pointer"
                             accept="image/*"
-                            onChange={handleImageChange}
+                            onChange={() => {}} // TODOs 7: Connect to handleImageChange
                             required
                           />
                         </Button>
@@ -283,7 +233,9 @@ export default function CreateNFT() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {collections.length === 0 && !isLoading && (
+
+                    {/* TODOs 8: display the element only if there is not collection found */}
+                    {false && (
                       <p className="text-sm text-amber-500">
                         No existing collections found. Create a new collection first.
                       </p>
@@ -354,12 +306,13 @@ export default function CreateNFT() {
 
                 {/* Submit Button */}
                 <div className="pt-4">
+                  {/* TODOs 9: replace false with transactionInProcess*/}
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                    disabled={transactionInProcess || uploadingFile || !fileUrl || (collectionChoice === "existing" && !nftData.collection)}
+                    disabled={false || uploadingFile || !fileUrl || (collectionChoice === "existing" && !nftData.collection)}
                   >
-                    {transactionInProcess ? (
+                    {false ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Minting NFT...

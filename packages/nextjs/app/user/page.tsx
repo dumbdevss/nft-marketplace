@@ -26,7 +26,6 @@ import {
 import { Badge } from "~~/components/ui/badge"
 import { Navbar } from "~~/components/navbar"
 import { Footer } from "~~/components/footer"
-import { useView } from "~~/hooks/scaffold-move/useView"
 import useSubmitTransaction from "~~/hooks/scaffold-move/useSubmitTransaction"
 import { Loader2, Grid, Layers, Tag, Info, DollarSign, Clock, Timer } from "lucide-react"
 import { NFT } from "~~/types/nft-types"
@@ -55,29 +54,31 @@ export default function UserPortfolio() {
   const { account } = useWallet()
   const { submitTransaction, transactionInProcess } = useSubmitTransaction("NFTMarketplace")
 
-  // Fetch user's collections
+  // TODO 27: Implement useView hook for fetching user's collections
   const {
     data: collectionsData,
     error: collectionsError,
     isLoading: isLoadingCollections,
     refetch: refetchCollections
-  } = useView({
-    moduleName: "NFTMarketplace",
-    functionName: "get_all_collections_by_user",
-    args: [account?.address as `0x${string}`, 10, 0],
-  })
+  } = {
+    data: [[]],
+    error: "",
+    isLoading: false,
+    refetch: () => {}
+  }
 
-  // Fetch user's NFTs
+  // TODO 28: Implement useView hook for fetching user's NFTs
   const {
     data: nftsData,
     error: nftsError,
     isLoading: isLoadingNFTs,
     refetch: refetchNFTs
-  } = useView({
-    moduleName: "NFTMarketplace",
-    functionName: "get_user_nfts",
-    args: [account?.address as `0x${string}`]
-  })
+  } = {
+    data: [[]],
+    error: "",
+    isLoading: false,
+    refetch: () => {}
+  }
 
   // Parse and format data
   const collections = collectionsData?.[0] as Collection[] || []
@@ -97,158 +98,42 @@ export default function UserPortfolio() {
     return maxDate.toISOString().split('T')[0]
   }
 
+  // TODO 29: Implement handleListNFT function
+  /*
   const handleListNFT = async () => {
-    if (!selectedNFT) {
-      toast({
-        title: "No NFT Selected",
-        description: "Please select an NFT to list",
-        variant: "destructive"
-      })
-      return
-    }
-
-    try {
-      // Validate inputs
-      if (saleType === SaleType.AUCTION && (!auctionMinBid || !auctionDeadline)) {
-        throw new Error("Auction minimum bid and deadline are required")
-      }
-
-      const price = parseFloat(listingPrice)
-      if ((isNaN(price) || price <= 0) && saleType === SaleType.INSTANT) {
-        throw new Error("Invalid listing price")
-      }
-
-      const auctionMinPrice = parseFloat(auctionMinBid)
-      if ((isNaN(auctionMinPrice) || auctionMinPrice <= 0) && saleType === SaleType.AUCTION) {
-        throw new Error("Invalid auction minimum bid")
-      }
-
-      const priceInOctas = Math.floor(saleType === SaleType.INSTANT ? price * 100000000 : (auctionMinPrice * 100000000)) // Convert to octas, ensure integer
-      const deadlineTimestamp = auctionDeadline
-        ? Math.floor(new Date(auctionDeadline).getTime() / 1000)
-        : null
-
-      // Validate auction deadline if applicable
-      if (saleType === SaleType.AUCTION && deadlineTimestamp && deadlineTimestamp <= Math.floor(Date.now() / 1000)) {
-        throw new Error("Auction deadline must be in the future")
-      }
-
-      // Submit transaction
-      await submitTransaction("list_nft_for_sale", [
-        parseInt(selectedNFT.id),
-        priceInOctas,
-        saleType === SaleType.INSTANT ? 0 : 1,
-        deadlineTimestamp
-      ])
-
-      // Show success message
-      toast({
-        title: "NFT Listed Successfully",
-        description: `${selectedNFT.name} has been listed for ${saleType === SaleType.INSTANT ? price : auctionMinBid} MOVE`,
-        variant: "default"
-      })
-
-      // Reset form
-      setIsListingDialogOpen(false)
-      setListingPrice("")
-      setAuctionMinBid("")
-      setAuctionDeadline("")
-      setSelectedNFT(null)
-      setSaleType(SaleType.INSTANT)
-
-      // Refresh NFT list after a short delay
-      setTimeout(() => {
-        refetchNFTs()
-      }, 2000)
-    } catch (error: any) {
-      console.error("Failed to list NFT:", error)
-      toast({
-        title: "Failed to List NFT",
-        description: error.message || "An error occurred while listing your NFT",
-        variant: "destructive"
-      })
-    }
+    // 1. Check if an NFT is selected and show error toast if not
+    // 2. Validate inputs for auction (min bid and deadline) or instant sale (price)
+    // 3. Convert price or min bid to octas (smallest units)
+    // 4. Convert auction deadline to timestamp if applicable
+    // 5. Validate auction deadline is in the future
+    // 6. Submit transaction to list NFT for sale with appropriate parameters
+    // 7. Show success toast with NFT details
+    // 8. Reset form fields and dialog state
+    // 9. Refresh NFT list after a delay
+    // 10. Handle any errors and show error toast
   }
+  */
 
+  // TODO 30: Implement handleCancelListing function
+  /*
   const handleCancelListing = async (nft: NFT) => {
-    // Check if an NFT is selected
-    if (!nft || !nft.id) {
-      toast({
-        title: "No NFT Selected",
-        description: "Please select an NFT to cancel listing",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Check if the NFT is actually listed for sale
-    if (!nft.for_sale) {
-      toast({
-        title: "NFT Not Listed",
-        description: "This NFT is not currently listed for sale",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      // Ensure ID is properly converted to a number
-      const nftId = typeof nft.id === 'string' ? parseInt(nft.id, 10) : nft.id;
-
-      // Check for NaN after parsing
-      if (isNaN(nftId)) {
-        throw new Error("Invalid NFT ID format");
-      }
-
-      // Submit transaction to cancel the listing
-      const txResult = await submitTransaction("cancel_listing", [nftId]);
-
-      // Handle successful cancellation
-      if (txResult) {
-        toast({
-          title: "NFT Listing Cancelled",
-          description: `${nft.name} listing has been cancelled successfully`,
-          variant: "default",
-          action: (
-            <Link
-              href={`http://explorer.movementnetwork.xyz/txn/${txResult}`}
-              target="_blank"
-              className="text-blue-500 hover:underline"
-            >
-              View Transaction
-            </Link>
-          )
-        });
-      }
-
-      // Refresh NFT data after a short delay to allow blockchain confirmation
-      setTimeout(() => {
-        refetchNFTs();
-      }, 2000);
-
-    } catch (error) {
-      // Improved error handling with specific messages
-      console.error("Failed to cancel listing:", error);
-
-      // Provide more specific error messages if possible
-      const errorMessage = error instanceof Error
-        ? error.message
-        : "An unknown error occurred while cancelling the listing";
-
-      toast({
-        title: "Failed to Cancel Listing",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    }
-  };
-
-
-  // Function to open listing dialog with selected NFT
-  const openListingDialog = (nft: NFT) => {
-    setSelectedNFT(nft)
-    setIsListingDialogOpen(true)
+    // 1. Check if an NFT is selected and show error toast if not
+    // 2. Check if the NFT is listed for sale and show error toast if not
+    // 3. Convert NFT ID to number and validate
+    // 4. Submit transaction to cancel the listing
+    // 5. Show success toast with transaction link
+    // 6. Refresh NFT data after a delay
+    // 7. Handle any errors and show error toast with specific message
   }
+  */
+
+  // TODO 31: Implement openListingDialog function
+  /*
+  const openListingDialog = (nft: NFT) => {
+    // 1. Set the selected NFT
+    // 2. Open the listing dialog
+  }
+  */
 
   // Function to get NFT status badge
   const getNftStatusBadge = (nft: NFT) => {
@@ -346,7 +231,7 @@ export default function UserPortfolio() {
                         <span className="text-sm text-gray-400">Not listed</span>
                       )}
                     </CardContent>
-                    <CardFooter className="p-4 pt-0 flex  items-center gap-2">
+                    <CardFooter className="p-4 pt-0 flex items-center gap-2">
                       <Link className="flex-1" href={`/nft/${nft.id}`}>
                         <Button
                           variant="outline"
@@ -361,7 +246,7 @@ export default function UserPortfolio() {
                           variant="destructive"
                           size="sm"
                           className="flex-1 hover:bg-red-700 transition-colors"
-                          onClick={() => handleCancelListing(nft)}
+                          onClick={() => {}} // TODO 32: Connect to handleCancelListing
                         >
                           Cancel Listing
                         </Button>
@@ -370,7 +255,7 @@ export default function UserPortfolio() {
                           variant="outline"
                           size="sm"
                           className="flex-1 hover:bg-blue-50 transition-colors"
-                          onClick={() => openListingDialog(nft)}
+                          onClick={() => {}} // TODO 33: Connect to openListingDialog
                         >
                           List for Sale
                         </Button>
@@ -559,7 +444,7 @@ export default function UserPortfolio() {
               Cancel
             </Button>
             <Button
-              onClick={handleListNFT}
+              onClick={() => {}} // TODO 34: Connect to handleListNFT
               disabled={(saleType === SaleType.INSTANT && !listingPrice) ||
                 (saleType === SaleType.AUCTION && (!auctionMinBid || !auctionDeadline)) ||
                 transactionInProcess}

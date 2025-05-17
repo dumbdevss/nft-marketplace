@@ -15,10 +15,8 @@ import Receipt from "~~/components/receipt"
 import { useToast } from "~~/hooks/use-toast"
 import { NFT } from "~~/types/nft-types"
 import { useWallet } from "@aptos-labs/wallet-adapter-react"
-import useSubmitTransaction from "~~/hooks/scaffold-move/useSubmitTransaction"
 import { getNFTById } from "~~/lib/nft-data"
 import { Clock, Heart, Share2, Tag, MoveIcon as Transfer } from "lucide-react"
-import { useView } from "~~/hooks/scaffold-move/useView"
 import CopyToClipboard from "react-copy-to-clipboard"
 
 // Define the NFTDetails type
@@ -57,20 +55,22 @@ export default function NFTDetail() {
   const [offerAmount, setOfferAmount] = useState(0)
   const [transactionType, setTransactionType] = useState<"purchase" | "transfer" | "offer" | "resolve">('purchase')
   const { account } = useWallet()
-  const { submitTransaction, transactionInProcess } = useSubmitTransaction("NFTMarketplace")
-  const [like, setLike] = useState(false)
-  const { toast } = useToast()
 
-  // Fetch NFT data using the useView hook
+  // TODO 13: Using useSubmitTransaction hook get the submitTransaction function and transactionInProcess
+
+  const { toast } = useToast()
+  const [like, setLike] = useState(false)
+
+  // TODO 14: Implement useView hook for fetching NFT details
   const {
     data: nftRawData,
     refetch: refetchNFT,
     isLoading
-  } = useView({
-    moduleName: "NFTMarketplace",
-    functionName: "get_nft_details",
-    args: [parseInt(id as string)],
-  })
+  } = {
+    data: [[]],
+    error: "",
+    isLoading: false
+  }
 
   // Parse NFT data using useMemo with proper typing
   const nftData = useMemo<NFTDetails | null>(() => {
@@ -118,91 +118,65 @@ export default function NFTDetail() {
   const isAuction = nftData?.sale_type === 1;
   const auctionEnded = isAuction && nftData?.auction?.deadline < Date.now() / 1000;
 
+  // TODO 15: Implement handlePurchase function
+  /*
   const handlePurchase = async () => {
-    try {
-
-      setTransactionType("purchase");
-
-      const response = await submitTransaction("purchase_nft", [
-        parseInt(id as string),
-      ]);
-
-      setHash(response);
-      setShowBuyDialog(false);
-
-      // Wait for blockchain to process
-      setTimeout(async () => {
-        await refetchNFT();
-        setShowReceipt(true);
-      }, 2000);
-    } catch (error) {
-      console.error("Failed to purchase NFT:", error);
-    }
+    // 1. Set transaction type to "purchase"
+    // 2. Submit transaction to purchase NFT using NFT ID
+    // 3. Store transaction hash
+    // 4. Close buy dialog
+    // 5. Wait for blockchain processing and refetch NFT data
+    // 6. Show receipt dialog
+    // 7. Handle any errors
   }
+  */
 
+  // TODO 16: Implement handlePlaceOffer function
+  /*
   const handlePlaceOffer = async () => {
-    try {
-      setShowOfferDialog(false);
-      setTransactionType("offer");
-
-      // Convert to smallest units
-      const offerAmountInSmallestUnits = Math.floor(offerAmount * 100000000);
-
-      const response = await submitTransaction("place_offer", [
-        parseInt(id as string),
-        offerAmountInSmallestUnits,
-      ]);
-
-      setHash(response);
-
-      setTimeout(async () => {
-        await refetchNFT();
-        setShowReceipt(true);
-      }, 2000);
-    } catch (error) {
-      console.error("Failed to place offer:", error);
-    }
+    // 1. Close offer dialog
+    // 2. Set transaction type to "offer"
+    // 3. Convert offer amount to smallest units
+    // 4. Submit transaction to place offer with NFT ID and offer amount
+    // 5. Store transaction hash
+    // 6. Wait for blockchain processing and refetch NFT data
+    // 7. Show receipt dialog
+    // 8. Handle any errors
   }
+  */
 
+  // TODO 17: Implement handleTransferNFT function
+  /*
   const handleTransferNFT = async () => {
-    try {
-      setShowTransferDialog(false);
-      setTransactionType("transfer");
-
-      const response = await submitTransaction("transfer_nft", [
-        parseInt(id as string),
-        transferAddress,
-      ]);
-
-      setHash(response);
-
-      setTimeout(async () => {
-        await refetchNFT();
-        setShowReceipt(true);
-      }, 2000);
-    } catch (error) {
-      console.error("Failed to transfer NFT:", error);
-    }
+    // 1. Close transfer dialog
+    // 2. Set transaction type to "transfer"
+    // 3. Submit transaction to transfer NFT using NFT ID and recipient address
+    // 4. Store transaction hash
+    // 5. Wait for blockchain processing and refetch NFT data
+    // 6. Show receipt dialog
+    // 7. Handle any errors
   }
+  */
 
+  // TODO 18: Implement handleResolveAuction function
+  /*
   const handleResolveAuction = async () => {
-    try {
-      setTransactionType("resolve");
-
-      const response = await submitTransaction("finalize_auction", [
-        parseInt(id as string),
-      ]);
-
-      setHash(response);
-
-      setTimeout(async () => {
-        await refetchNFT();
-        setShowReceipt(true);
-      }, 2000);
-    } catch (error) {
-      console.error("Failed to resolve auction:", error);
-    }
+    // 1. Set transaction type to "resolve"
+    // 2. Submit transaction to finalize auction using NFT ID
+    // 3. Store transaction hash
+    // 4. Wait for blockchain processing and refetch NFT data
+    // 5. Show receipt dialog
+    // 6. Handle any errors
   }
+  */
+
+  // TODO 19: Implement handleLike function
+  /*
+  const handleLike = () => {
+    // 1. Toggle like state
+    // 2. Show toast notification indicating like or unlike action
+  }
+  */
 
   if (isLoading) {
     return (
@@ -247,21 +221,11 @@ export default function NFTDetail() {
   const handleCopy = () => {
     toast({
       title: 'Success',
-      description: "NFt link copied to clipboard",
+      description: "NFT link copied to clipboard",
       variant: 'default',
       className: 'bg-green-700 text-foreground',
     });
   };
-
-  const handleLike = () => {
-    setLike(!like);
-    toast({
-      title: like ? 'Unliked' : 'Liked',
-      description: like ? "You unliked this NFT" : "You liked this NFT",
-      variant: 'default',
-      className: 'bg-green-700 text-foreground',
-    });
-   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-background/80">
@@ -285,7 +249,7 @@ export default function NFTDetail() {
                   {nft.collection_name}
                 </Badge>
                 <div className="flex gap-2">
-                  <Button onClick={handleLike} variant="outline" size="icon">
+                  <Button onClick={() => { }} variant="outline" size="icon"> {/* TODO 20: Connect to handleLike */}
                     <Heart className={`h-4 w-4 ${like && 'fill-red-700'}`} />
                   </Button>
                   <CopyToClipboard text={`http://localhost/nft/${nft.id}`} onCopy={handleCopy}>
@@ -343,8 +307,8 @@ export default function NFTDetail() {
 
                       {isAuction && auctionEnded && (
                         <Button
-                          onClick={handleResolveAuction}
-                          disabled={transactionInProcess}
+                          onClick={() => { }} // TODO 21: Connect to handleResolveAuction and false to transactionInProcess from the submitTransaction hook
+                          disabled={false}
                           className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                         >
                           Resolve Auction
@@ -476,12 +440,13 @@ export default function NFTDetail() {
               <span className="font-medium">Total</span>
               <span className="font-medium">{((nft.price * 0.05) + nft.price).toFixed(2)} MOVE</span>
             </div>
+            {/* TODO 22: Connect to handlePurchase and change false to transactionInProcess from the useSubmitTransaction hook  */}
             <Button
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              onClick={handlePurchase}
-              disabled={transactionInProcess}
+              onClick={() => { }} 
+              disabled={false}
             >
-              {transactionInProcess ? "Processing..." : "Confirm Purchase"}
+              {false ? "Processing..." : "Confirm Purchase"}
             </Button>
           </div>
         </DialogContent>
@@ -513,18 +478,19 @@ export default function NFTDetail() {
                 </p>
               )}
             </div>
-            <div className="border-t border-muted pt-2 flex items-center justify-between">
+            <div className="border-t border-muted bt-2 flex items-center justify-between">
               <span>Processing Fee</span>
               <span className="font-medium">{offerAmount + (0.05 * offerAmount)} MOVE</span>
             </div>
+            {/* TODO 23: change false to transactionInProcess from the submitTransaction hook */}
             <Button
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              onClick={handlePlaceOffer}
-              disabled={transactionInProcess ||
+              onClick={() => { }} // TODO 24: Connect to handlePlaceOffer
+              disabled={false ||
                 (isAuction && offerAmount <= nft.price) ||
                 offerAmount <= 0}
             >
-              {transactionInProcess ? "Processing..." : `Confirm ${isAuction ? "Bid" : "Offer"}`}
+              {false ? "Processing..." : `Confirm ${isAuction ? "Bid" : "Offer"}`}
             </Button>
           </div>
         </DialogContent>
@@ -553,12 +519,13 @@ export default function NFTDetail() {
               <span>Gas Fee</span>
               <span className="font-medium">0.002 MOVE</span>
             </div>
+            {/* TODO 25: change false to transactionInProcess from the submitTransaction hook */}
             <Button
               className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              onClick={handleTransferNFT}
-              disabled={transactionInProcess || !transferAddress.startsWith('0x') || transferAddress.length < 10}
+              onClick={() => { }} // TODO 26: Connect to handleTransferNFT
+              disabled={false || !transferAddress.startsWith('0x') || transferAddress.length < 10}
             >
-              {transactionInProcess ? "Processing..." : "Confirm Transfer"}
+              {false ? "Processing..." : "Confirm Transfer"}
             </Button>
           </div>
         </DialogContent>
