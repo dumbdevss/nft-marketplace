@@ -62,9 +62,9 @@ export default function UserPortfolio() {
     refetch: refetchCollections
   } = {
     data: [[]],
-    error: "",
+    error: {message: ""},
     isLoading: false,
-    refetch: () => {}
+    refetch: () => { }
   }
 
   // TODO 28: Implement useView hook for fetching user's NFTs
@@ -77,7 +77,7 @@ export default function UserPortfolio() {
     data: [[]],
     error: "",
     isLoading: false,
-    refetch: () => {}
+    refetch: () => { }
   }
 
   // Parse and format data
@@ -135,27 +135,17 @@ export default function UserPortfolio() {
   }
   */
 
-  // Function to get NFT status badge
+  // TODO 32: using dynamic styling create a For Sale, For Auction and Not Listed badge
   const getNftStatusBadge = (nft: NFT) => {
-    if (nft.sale_type === 0 && nft.for_sale) {
-      return (
-        <Badge className="bg-green-100 text-green-800 whitespace-nowrap hover:bg-green-200">
-          For Sale
-        </Badge>
-      )
-    } else if (nft.sale_type === 1 && nft.for_sale) {
-      return (
-        <Badge className="bg-green-100 text-green-800 whitespace-nowrap hover:bg-green-200">
-          For Auction
-        </Badge>
-      )
-    } else {
-      return (
-        <Badge className="bg-purple-100 text-purple-800 whitespace-nowrap hover:bg-purple-200">
-          Not Listed
-        </Badge>
-      )
-    }
+    //      <Badge className="bg-green-100 text-green-800 whitespace-nowrap hover:bg-green-200">
+    //           For Sale
+    //        </Badge>
+    //       <Badge className="bg-green-100 text-green-800 whitespace-nowrap hover:bg-green-200">
+    //           For Auction
+    //       </Badge>
+    return (<Badge className="bg-purple-100 text-purple-800 whitespace-nowrap hover:bg-purple-200">
+      Not Listed
+    </Badge>)
   }
 
   return (
@@ -246,7 +236,7 @@ export default function UserPortfolio() {
                           variant="destructive"
                           size="sm"
                           className="flex-1 hover:bg-red-700 transition-colors"
-                          onClick={() => {}} // TODO 32: Connect to handleCancelListing
+                          onClick={() => { }} // TODO 33: Connect to handleCancelListing
                         >
                           Cancel Listing
                         </Button>
@@ -255,7 +245,7 @@ export default function UserPortfolio() {
                           variant="outline"
                           size="sm"
                           className="flex-1 hover:bg-blue-50 transition-colors"
-                          onClick={() => {}} // TODO 33: Connect to openListingDialog
+                          onClick={() => { }} // TODO 34: Connect to openListingDialog
                         >
                           List for Sale
                         </Button>
@@ -444,7 +434,7 @@ export default function UserPortfolio() {
               Cancel
             </Button>
             <Button
-              onClick={() => {}} // TODO 34: Connect to handleListNFT
+              onClick={() => { }} // TODO 35: Connect to handleListNFT
               disabled={(saleType === SaleType.INSTANT && !listingPrice) ||
                 (saleType === SaleType.AUCTION && (!auctionMinBid || !auctionDeadline)) ||
                 transactionInProcess}

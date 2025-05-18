@@ -41,8 +41,9 @@ export default function Marketplace() {
     refetch: refetchCollections
   } = {
     data: [[]],
-    error: "",
-    isLoading: false
+    error:  {message: ""},
+    isLoading: false,
+    refetch: () => {}
   }
 
   // TODO 11: Implement useView hook for fetching NFTs for sale

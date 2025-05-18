@@ -68,7 +68,7 @@ export default function NFTDetail() {
     isLoading
   } = {
     data: [[]],
-    error: "",
+    refetch: () => {},
     isLoading: false
   }
 

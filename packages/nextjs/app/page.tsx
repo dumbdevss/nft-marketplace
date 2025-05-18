@@ -7,15 +7,16 @@ import { Navbar } from "~~/components/navbar"
 import { FeaturedNFTs } from "~~/components/featured-nfts"
 import { Footer } from "~~/components/footer"
 import { AnimatedCounter } from "~~/components/animated-counter"
-import { useView } from "~~/hooks/scaffold-move/useView"
 import { NFT } from "~~/types/nft-types"
 
 export default function Home() {
 
-  const { data, error, isLoading } = useView({
-    moduleName: "NFTMarketplace",
-    functionName: "get_nfts_for_sale",
-  })
+  // TODO 1: Connect to handleListNFT
+  const { data, error, isLoading } = {
+    data: [[]],
+    error: {message: ""},
+    isLoading: false
+  }
 
   let nftsForSale = data?.[0] as NFT[] || []
 

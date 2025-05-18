@@ -47,7 +47,7 @@ export default function CreateNFT() {
   // TODOs 3: Implement useView hook for fetching user collections
   const { data, error, isLoading, refetch } = {
     data: [[]],
-    error: "",
+    error:  {message: ""},
     isLoading: false,
     refetch: () => {}
   }
